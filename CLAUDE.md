@@ -53,3 +53,39 @@ Three strictly separated layers. New package support requires only writing a new
 ## Design Principle
 
 Beautiful LaTeX tables with a single function call, just like the original `stargazer`. **Familiarity and simplicity are core values.**
+
+## Key Design Decisions
+
+### 1. Fixed Effects Reporting
+
+- Fixed effects should **never** appear as coefficient rows
+- Instead, report FEs as indicator rows at the bottom of the table (before fit statistics), one row per unique FE variable across all models, with Yes/No entries per column
+- Extract FE information from fixest's `fixef_vars` slot
+
+### 2. Standard Error Reporting
+
+- Always display the SE type actually used in estimation; do not assume classical OLS standard errors
+- Add a table note identifying the SE type, e.g. "Robust standard errors in parentheses" or "Standard errors clustered by X"
+- User can override SE type display via a function argument
+- Extract SE type from fixest's `se_type` and `cluster` slots
+
+### 3. First Test Case
+
+Use Laurent Berge's first fixest walkthrough example as the canonical test, which produces a 3-column table:
+
+```r
+library(fixest)
+data(trade)
+gravity_ols     = feols(log(Euros) ~ log(dist_km) | Origin + Destination + Product + Year, trade)
+gravity_pois    = fepois(Euros ~ log(dist_km) | Origin + Destination + Product + Year, trade)
+gravity_negbin  = fenegbin(Euros ~ log(dist_km) | Origin + Destination + Product + Year, trade)
+```
+
+`stargazer(gravity_ols, gravity_pois, gravity_negbin)` should produce a clean LaTeX table with:
+
+- One column per model
+- Coefficient rows for `log(dist_km)`
+- FE indicator rows for Origin, Destination, Product, Year
+- SE type note appropriate to each model
+- Fit statistics (N, R² or equivalent per model type)
+- Column headers identifying the estimator used
