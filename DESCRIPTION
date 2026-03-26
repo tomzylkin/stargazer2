@@ -5,7 +5,7 @@ Version: 0.0.1
 Date: 2026-03-26
 Authors@R: c(
     person("Tom", "Zylkin", role = c("aut", "cre"),
-           email = "tzylkin@example.com"))
+           email = "tzylkin@richmond.edu"))
 Description: Produces publication-quality LaTeX, ASCII, and HTML regression
     tables. Designed as a drop-in replacement for the 'stargazer' package
     with added support for modern econometrics packages including 'fixest'
