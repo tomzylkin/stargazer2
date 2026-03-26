@@ -85,7 +85,7 @@ check_lm_record <- function(rec, model, vcov_mat = NULL, tol = 1e-10) {
 test_that("extract_model.lm: m1 OLS SEs are exact", {
   wage1 <- setup_wage1()
   m1    <- lm(lwage ~ educ + exper + tenure, wage1)
-  rec   <- extract_model(m1)
+  rec   <- stargazer2:::extract_model(m1)
   check_lm_record(rec, m1, tol = tol)
   expect_equal(rec$se_label, "OLS standard errors")
   expect_equal(rec$model_label, "OLS")
@@ -94,7 +94,7 @@ test_that("extract_model.lm: m1 OLS SEs are exact", {
 test_that("extract_model.lm: m2 OLS SEs are exact", {
   wage1 <- setup_wage1()
   m2    <- lm(lwage ~ educ + exper + tenure + female + married, wage1)
-  rec   <- extract_model(m2)
+  rec   <- stargazer2:::extract_model(m2)
   check_lm_record(rec, m2, tol = tol)
 })
 
@@ -102,7 +102,7 @@ test_that("extract_model.lm: m3 with region + occupation OLS SEs are exact", {
   wage1 <- setup_wage1()
   m3    <- lm(lwage ~ educ + exper + tenure + female + married +
                 region + occupation, wage1)
-  rec   <- extract_model(m3)
+  rec   <- stargazer2:::extract_model(m3)
   check_lm_record(rec, m3, tol = tol)
   # Non-intercept covariate names must match coef(model)
   # ("(Intercept)" is renamed to "Constant" per stargazer convention)
@@ -114,7 +114,7 @@ test_that("extract_model.lm: m4 full model OLS SEs are exact", {
   wage1 <- setup_wage1()
   m4    <- lm(lwage ~ educ + exper + tenure + female + married +
                 region + occupation + industry, wage1)
-  rec   <- extract_model(m4)
+  rec   <- stargazer2:::extract_model(m4)
   check_lm_record(rec, m4, tol = tol)
 })
 
@@ -127,7 +127,7 @@ test_that("extract_model.lm: HC1 vcov override gives correct SEs", {
   wage1 <- setup_wage1()
   m1    <- lm(lwage ~ educ + exper + tenure, wage1)
   V     <- sandwich::vcovHC(m1, type = "HC1")
-  rec   <- extract_model(m1, vcov_override = V)
+  rec   <- stargazer2:::extract_model(m1, vcov_override = V)
 
   expect_equal(rec$se, unname(sqrt(diag(V))), tolerance = tol)
   # Coefficients unchanged
@@ -147,7 +147,7 @@ test_that("extract_model.lm: clustered vcov override gives correct SEs", {
   wage1 <- setup_wage1()
   m2    <- lm(lwage ~ educ + exper + tenure + female + married, wage1)
   V     <- sandwich::vcovCL(m2, cluster = ~industry, data = wage1)
-  rec   <- extract_model(m2, vcov_override = V)
+  rec   <- stargazer2:::extract_model(m2, vcov_override = V)
 
   expect_equal(rec$se, unname(sqrt(diag(V))), tolerance = tol)
   expect_true(nchar(rec$se_label) > 0L)
@@ -161,7 +161,7 @@ test_that("extract_model.lm: se vector override accepted", {
   wage1    <- setup_wage1()
   m1       <- lm(lwage ~ educ + exper + tenure, wage1)
   fake_se  <- rep(0.1, length(coef(m1)))
-  rec      <- extract_model(m1, se_override = fake_se)
+  rec      <- stargazer2:::extract_model(m1, se_override = fake_se)
   expect_equal(rec$se, fake_se, tolerance = tol)
 })
 
@@ -172,7 +172,7 @@ test_that("extract_model.lm: se vector override accepted", {
 test_that("extract_model.lm: p-values consistent with t-stats", {
   wage1 <- setup_wage1()
   m1    <- lm(lwage ~ educ + exper + tenure, wage1)
-  rec   <- extract_model(m1)
+  rec   <- stargazer2:::extract_model(m1)
 
   # Higher |t| must imply lower p
   ord_t <- order(abs(rec$tstat), decreasing = TRUE)
@@ -191,6 +191,6 @@ test_that("extract_model.lm: nobs matches nobs(model)", {
   wage1 <- setup_wage1()
   m3    <- lm(lwage ~ educ + exper + tenure + female + married +
                 region + occupation, wage1)
-  rec   <- extract_model(m3)
+  rec   <- stargazer2:::extract_model(m3)
   expect_equal(rec$nobs, as.integer(nobs(m3)))
 })

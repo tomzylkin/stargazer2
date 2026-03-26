@@ -54,7 +54,7 @@ test_that("extract_model.fixest: feols coefs match fixest::coef()", {
     lwage ~ educ + exper + tenure + female + married | region + occupation,
     data = wage1
   )
-  rec <- extract_model(f3)
+  rec <- stargazer2:::extract_model(f3)
 
   expect_equal(rec$coefs, unname(coef(f3)), tolerance = tol)
   expect_equal(rec$coef_names, names(coef(f3)))
@@ -66,7 +66,7 @@ test_that("extract_model.fixest: feols auto-extracted SEs match vcov(model)", {
     lwage ~ educ + exper + tenure + female + married | region + occupation,
     data = wage1
   )
-  rec <- extract_model(f3)
+  rec <- stargazer2:::extract_model(f3)
   expected_se <- unname(sqrt(diag(vcov(f3))))
   expect_equal(rec$se, expected_se, tolerance = tol)
 })
@@ -79,7 +79,7 @@ test_that("extract_model.fixest: feols HC1 vcov override gives correct SEs", {
     data  = wage1,
     vcov  = "HC1"
   )
-  rec <- extract_model(f4)
+  rec <- stargazer2:::extract_model(f4)
   expected_se <- unname(sqrt(diag(vcov(f4))))
   expect_equal(rec$se, expected_se, tolerance = tol)
 })
@@ -95,7 +95,7 @@ test_that("extract_model.fixest: vcov matrix override replaces auto-extracted SE
   p  <- length(coef(f1))
   V  <- diag(seq(0.01, 0.01 * p, by = 0.01))
   rownames(V) <- colnames(V) <- names(coef(f1))
-  rec <- extract_model(f1, vcov_override = V)
+  rec <- stargazer2:::extract_model(f1, vcov_override = V)
   expect_equal(rec$se, unname(sqrt(diag(V))), tolerance = tol)
   # Coefficients unchanged
   expect_equal(rec$coefs, unname(coef(f1)), tolerance = tol)
@@ -111,7 +111,7 @@ test_that("extract_model.fixest: single FE detected correctly", {
     lwage ~ educ + exper + tenure + female + married | region,
     data = wage1
   )
-  rec <- extract_model(f1)
+  rec <- stargazer2:::extract_model(f1)
   expect_true("region" %in% rec$fixed_effects)
   expect_equal(length(rec$fixed_effects), 1L)
 })
@@ -122,7 +122,7 @@ test_that("extract_model.fixest: two FEs detected correctly", {
     lwage ~ educ + exper + tenure + female + married | region + occupation,
     data = wage1
   )
-  rec <- extract_model(f3)
+  rec <- stargazer2:::extract_model(f3)
   expect_setequal(rec$fixed_effects, c("region", "occupation"))
 })
 
@@ -133,7 +133,7 @@ test_that("extract_model.fixest: three FEs detected correctly", {
       region + occupation + industry,
     data = wage1
   )
-  rec <- extract_model(f4)
+  rec <- stargazer2:::extract_model(f4)
   expect_setequal(rec$fixed_effects, c("region", "occupation", "industry"))
 })
 
@@ -143,7 +143,7 @@ test_that("extract_model.fixest: interacted FE detected as single entry", {
     lwage ~ educ + exper + tenure + female + married | region^industry,
     data = wage1
   )
-  rec <- extract_model(f5)
+  rec <- stargazer2:::extract_model(f5)
   # Should have exactly one FE entry containing the interaction
   expect_equal(length(rec$fixed_effects), 1L)
   expect_true(grepl("region", rec$fixed_effects[1L], fixed = TRUE))
@@ -160,7 +160,7 @@ test_that("extract_model.fixest: nobs matches fixest::nobs()", {
     lwage ~ educ + exper + tenure + female + married | region + occupation,
     data = wage1
   )
-  rec <- extract_model(f3)
+  rec <- stargazer2:::extract_model(f3)
   expect_equal(rec$nobs, as.integer(nobs(f3)))
 })
 
@@ -171,7 +171,7 @@ test_that("extract_model.fixest: nobs matches fixest::nobs()", {
 test_that("extract_model.fixest: feols labelled as OLS", {
   wage1 <- setup_wage1_fixest()
   f1 <- fixest::feols(lwage ~ educ | region, data = wage1)
-  rec <- extract_model(f1)
+  rec <- stargazer2:::extract_model(f1)
   expect_equal(rec$model_label, "OLS")
 })
 
@@ -180,7 +180,7 @@ test_that("extract_model.fixest: fepois labelled as Poisson", {
   data("trade", package = "fixest")
   m <- fixest::fepois(Euros ~ log(dist_km) | Origin + Destination + Product + Year,
                       data = trade)
-  rec <- extract_model(m)
+  rec <- stargazer2:::extract_model(m)
   expect_equal(rec$model_label, "Poisson")
 })
 
@@ -189,7 +189,7 @@ test_that("extract_model.fixest: fenegbin labelled as Neg. Binomial", {
   data("trade", package = "fixest")
   m <- fixest::fenegbin(Euros ~ log(dist_km) | Origin + Destination + Product + Year,
                         data = trade)
-  rec <- extract_model(m)
+  rec <- stargazer2:::extract_model(m)
   expect_equal(rec$model_label, "Neg. Binomial")
 })
 
@@ -204,7 +204,7 @@ test_that("gravity feols: within-R2 is non-NA and in [0,1]", {
     log(Euros) ~ log(dist_km) | Origin + Destination + Product + Year,
     data = trade
   )
-  rec <- extract_model(m)
+  rec <- stargazer2:::extract_model(m)
   expect_false(is.na(rec$fit$wr2))
   expect_true(rec$fit$wr2 >= 0 & rec$fit$wr2 <= 1)
 })
@@ -216,7 +216,7 @@ test_that("gravity fepois: pseudo-R2 is non-NA and in [0,1]", {
     Euros ~ log(dist_km) | Origin + Destination + Product + Year,
     data = trade
   )
-  rec <- extract_model(m)
+  rec <- stargazer2:::extract_model(m)
   pr2 <- rec$fit$pr2
   if (!is.na(pr2)) {
     expect_true(pr2 >= 0 & pr2 <= 1)
@@ -231,7 +231,7 @@ test_that("gravity: all four FEs detected across models", {
   m_negbin <- fixest::fenegbin(Euros ~ log(dist_km) | Origin + Destination + Product + Year, trade)
 
   for (m in list(m_ols, m_pois, m_negbin)) {
-    rec <- extract_model(m)
+    rec <- stargazer2:::extract_model(m)
     expect_setequal(rec$fixed_effects, c("Origin", "Destination", "Product", "Year"))
   }
 })
