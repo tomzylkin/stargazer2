@@ -1,0 +1,263 @@
+# Model extraction layer for stargazer2.
+#
+# Each method returns a model_record: a named list with a standardised
+# structure that the formatting layer consumes.  Adding support for a
+# new package means writing a new extract_model() method here; the
+# formatting and rendering layers are untouched.
+#
+# model_record fields
+# -------------------
+# coef_names    character  display names for coefficients (not LaTeX-escaped)
+# coefs         numeric    coefficient estimates
+# se            numeric    standard errors
+# tstat         numeric    t / z statistics
+# pval          numeric    two-sided p-values
+# nobs          integer    number of observations
+# fit           list       fit statistics (content varies by model type)
+# fixed_effects character  FE variable names; character(0) if none
+# se_label      character  SE type description for table note
+# model_label   character  estimator name for column header
+# dep_var       character  dependent variable name (not LaTeX-escaped)
+
+# ---------------------------------------------------------------------------
+# S3 generic
+# ---------------------------------------------------------------------------
+
+#' Extract a standardised model record from a regression object
+#'
+#' Internal S3 generic consumed by \code{\link{format_table}}.  Not intended
+#' for direct use.
+#'
+#' @param model A fitted model object.
+#' @param vcov_override A pre-computed variance-covariance matrix, or
+#'   \code{NULL} to auto-extract.
+#' @param se_override A named numeric vector of standard errors, or
+#'   \code{NULL} to auto-extract.
+#' @param ... Currently unused.
+#' @keywords internal
+extract_model <- function(model, vcov_override = NULL, se_override = NULL, ...) {
+  UseMethod("extract_model")
+}
+
+# ---------------------------------------------------------------------------
+# lm method
+# ---------------------------------------------------------------------------
+
+extract_model.lm <- function(model, vcov_override = NULL, se_override = NULL, ...) {
+  s <- summary(model)
+  coefs <- coef(model)
+  # Match original stargazer: rename "(Intercept)" to "Constant"
+  coef_names <- sub("^\\(Intercept\\)$", "Constant", names(coefs))
+
+  # --- Standard errors (three-tier precedence) ---
+  if (!is.null(vcov_override)) {
+    se_vals  <- sqrt(diag(vcov_override))
+    se_label <- se_label_from_vcov(vcov_override)
+  } else if (!is.null(se_override)) {
+    se_vals  <- se_override
+    se_label <- "Standard errors"
+  } else {
+    se_vals  <- sqrt(diag(vcov(model)))
+    se_label <- "OLS standard errors"
+  }
+
+  # t-statistics and two-sided p-values
+  tstat <- coefs / se_vals
+  df_r  <- df.residual(model)
+  pvals <- 2 * pt(-abs(tstat), df = df_r)
+
+  # --- Fit statistics ---
+  fstat     <- s$fstatistic   # c(value = , numdf = , dendf = )
+  fstat_p   <- if (!is.null(fstat)) {
+    pf(fstat["value"], fstat["numdf"], fstat["dendf"], lower.tail = FALSE)
+  } else NA_real_
+
+  fit <- list(
+    type       = "ols",
+    r2         = s$r.squared,
+    adj_r2     = s$adj.r.squared,
+    wr2        = NA_real_,
+    adj_wr2    = NA_real_,
+    sigma      = s$sigma,
+    df_residual = as.integer(df_r),
+    fstat      = if (!is.null(fstat)) unname(fstat["value"]) else NA_real_,
+    fstat_df1  = if (!is.null(fstat)) as.integer(fstat["numdf"]) else NA_integer_,
+    fstat_df2  = if (!is.null(fstat)) as.integer(fstat["dendf"]) else NA_integer_,
+    fstat_pval = unname(fstat_p)
+  )
+
+  # --- Dependent variable name ---
+  dep_var <- deparse(formula(model)[[2L]])
+
+  list(
+    coef_names    = coef_names,
+    coefs         = unname(coefs),
+    se            = unname(se_vals),
+    tstat         = unname(tstat),
+    pval          = unname(pvals),
+    nobs          = as.integer(nobs(model)),
+    fit           = fit,
+    fixed_effects = character(0L),
+    se_label      = se_label,
+    model_label   = "OLS",
+    dep_var       = dep_var
+  )
+}
+
+# ---------------------------------------------------------------------------
+# fixest method
+# ---------------------------------------------------------------------------
+
+extract_model.fixest <- function(model, vcov_override = NULL, se_override = NULL, ...) {
+  if (!requireNamespace("fixest", quietly = TRUE)) {
+    stop("Package 'fixest' is required but not installed.", call. = FALSE)
+  }
+
+  coefs      <- coef(model)
+  coef_names <- names(coefs)
+
+  # --- Standard errors (three-tier precedence) ---
+  if (!is.null(vcov_override)) {
+    se_vals  <- sqrt(diag(vcov_override))
+    se_label <- se_label_from_vcov(vcov_override)
+  } else if (!is.null(se_override)) {
+    se_vals  <- se_override
+    se_label <- "Standard errors"
+  } else {
+    # Use the vcov baked into the model at estimation time
+    se_vals  <- sqrt(diag(vcov(model)))
+    se_label <- se_label_fixest_model(model)
+  }
+
+  # t / z statistics and p-values
+  tstat <- unname(coefs) / unname(se_vals)
+  pvals <- pvals_fixest(model, tstat)
+
+  # --- Fixed effects ---
+  fixed_effects <- get_fixef_vars(model)
+
+  # --- Fit statistics ---
+  fit <- fit_stats_fixest(model)
+
+  # --- Dependent variable ---
+  dep_var <- deparse(formula(model)[[2L]])
+
+  # --- Model label ---
+  model_label <- fixest_model_label(model)
+
+  list(
+    coef_names    = coef_names,
+    coefs         = unname(coefs),
+    se            = unname(se_vals),
+    tstat         = tstat,
+    pval          = pvals,
+    nobs          = as.integer(nobs(model)),
+    fit           = fit,
+    fixed_effects = fixed_effects,
+    se_label      = se_label,
+    model_label   = model_label,
+    dep_var       = dep_var
+  )
+}
+
+# ---------------------------------------------------------------------------
+# default method — informative error
+# ---------------------------------------------------------------------------
+
+extract_model.default <- function(model, vcov_override = NULL, se_override = NULL, ...) {
+  cls <- paste(class(model), collapse = ", ")
+  stop(
+    "stargazer2 does not know how to extract results from an object of class: ",
+    cls, ".\n",
+    "Supported classes: lm, fixest.",
+    call. = FALSE
+  )
+}
+
+# ---------------------------------------------------------------------------
+# fixest helpers (internal)
+# ---------------------------------------------------------------------------
+
+# Return the FE variable names for a fixest model.
+get_fixef_vars <- function(model) {
+  # fixef_vars is the most direct route
+  fvars <- model$fixef_vars
+  if (!is.null(fvars) && length(fvars) > 0L) {
+    return(as.character(fvars))
+  }
+
+  # Fallback: parse the fixef formula
+  fml_fe <- tryCatch(
+    fixest::formula(model, type = "fixef"),
+    error = function(e) NULL
+  )
+  if (!is.null(fml_fe)) {
+    terms_fe <- attr(stats::terms(fml_fe), "term.labels")
+    if (length(terms_fe) > 0L) return(terms_fe)
+  }
+
+  character(0L)
+}
+
+# Compute two-sided p-values for a fixest model.
+# feols uses a t-distribution; GLM-family models use z (normal).
+pvals_fixest <- function(model, tstat) {
+  method <- model$method
+  if (is.null(method)) method <- "feols"
+
+  if (method == "feols") {
+    df_r <- tryCatch(
+      as.numeric(fixest::degrees_freedom(model, type = "t")),
+      error = function(e) Inf
+    )
+    if (length(df_r) != 1L || is.na(df_r)) df_r <- Inf
+    2 * pt(-abs(tstat), df = df_r)
+  } else {
+    # Poisson, NegBin, logit, probit, etc. — asymptotic z
+    2 * pnorm(-abs(tstat))
+  }
+}
+
+# Extract fit statistics from a fixest model.
+fit_stats_fixest <- function(model) {
+  method <- if (!is.null(model$method)) model$method else "feols"
+  n      <- as.integer(nobs(model))
+
+  if (method == "feols") {
+    r2_vals <- tryCatch(fixest::r2(model), error = function(e) NULL)
+    list(
+      nobs    = n,
+      r2      = if (!is.null(r2_vals)) unname(r2_vals["r2"])    else NA_real_,
+      adj_r2  = if (!is.null(r2_vals)) unname(r2_vals["ar2"])   else NA_real_,
+      wr2     = if (!is.null(r2_vals)) unname(r2_vals["wr2"])   else NA_real_,
+      adj_wr2 = if (!is.null(r2_vals)) unname(r2_vals["war2"])  else NA_real_,
+      type    = "ols"
+    )
+  } else {
+    # Count / GLM models: pseudo-R² and log-likelihood
+    r2_vals <- tryCatch(fixest::r2(model), error = function(e) NULL)
+    ll      <- tryCatch(as.numeric(logLik(model)), error = function(e) NA_real_)
+    list(
+      nobs    = n,
+      pr2     = if (!is.null(r2_vals)) unname(r2_vals["pr2"])  else NA_real_,
+      adj_pr2 = if (!is.null(r2_vals)) unname(r2_vals["apr2"]) else NA_real_,
+      ll      = ll,
+      type    = "glm"
+    )
+  }
+}
+
+# Map fixest method string to a display label for column headers.
+fixest_model_label <- function(model) {
+  method <- if (!is.null(model$method)) model$method else "feols"
+  switch(method,
+    feols    = "OLS",
+    fepois   = "Poisson",
+    fenegbin = "Neg. Binomial",
+    feglm    = {
+      fam <- tryCatch(model$family$family, error = function(e) "GLM")
+      if (is.null(fam)) "GLM" else fam
+    },
+    toupper(method)  # fallback
+  )
+}

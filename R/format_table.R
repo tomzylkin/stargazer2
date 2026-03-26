@@ -1,0 +1,364 @@
+# Table-formatting layer for stargazer2.
+#
+# format_table() takes a list of model_records (from extract.R) plus
+# user-supplied formatting options and returns a table_data list that
+# render_latex() / render_ascii() / render_html() consume.
+#
+# table_data fields
+# -----------------
+# n_cols         integer
+# dep_vars       character[n_cols]
+# model_labels   character[n_cols]  estimator names
+# col_numbers    character[n_cols]  "(1)", "(2)", ...
+# show_model_row logical            TRUE when model types or dep vars differ
+# coef_rows      list of coef_row
+# fe_rows        list of fe_row     empty list if no FEs
+# stat_rows      list of stat_row
+# se_notes       character          unique SE-type descriptions
+# star_note      character          significance-level legend
+#
+# coef_row / fe_row / stat_row: list(label, values, se_values)
+#   values and se_values are character vectors of length n_cols.
+#   se_values is NULL for non-coefficient rows.
+#   NA entries become "" in the rendered output.
+
+# ---------------------------------------------------------------------------
+# Main function
+# ---------------------------------------------------------------------------
+
+#' Assemble table data from a list of model records
+#'
+#' Internal; called by \code{\link{stargazer}}.
+#'
+#' @param records   List of model_record objects from \code{extract_model}.
+#' @param covariate.labels Character vector of display names for covariates,
+#'   applied positionally after \code{omit}/\code{keep} filtering.
+#' @param omit  Character vector of regex patterns; matching covariates are
+#'   dropped.
+#' @param keep  Character vector of regex patterns; only matching covariates
+#'   are kept (applied after \code{omit}).
+#' @param omit.stat Character vector of stat identifiers to suppress.
+#' @param digits      Integer; decimal places for coefficients and SEs.
+#' @param star.cutoffs Numeric vector of p-value thresholds (ascending).
+#' @param star.char    Character vector of star strings.
+#' @param no.space     Logical; suppress blank spacer rows.
+#' @keywords internal
+format_table <- function(records,
+                         covariate.labels = NULL,
+                         omit             = NULL,
+                         keep             = NULL,
+                         omit.stat        = NULL,
+                         digits           = 3L,
+                         star.cutoffs     = c(0.1, 0.05, 0.01),
+                         star.char        = c("*", "**", "***"),
+                         no.space         = FALSE) {
+
+  n_cols <- length(records)
+
+  dep_vars     <- vapply(records, `[[`, character(1L), "dep_var")
+  model_labels <- vapply(records, `[[`, character(1L), "model_label")
+  col_numbers  <- paste0("(", seq_len(n_cols), ")")
+
+  # Show an explicit model-type row when types or dep vars vary across columns
+  show_model_row <- (length(unique(model_labels)) > 1L) ||
+                    (length(unique(dep_vars)) > 1L)
+
+  # --- Coefficient rows ---
+  coef_rows <- build_coef_rows(
+    records, omit, keep, covariate.labels, digits, star.cutoffs, star.char
+  )
+
+  # --- Fixed-effects indicator rows ---
+  fe_rows <- build_fe_rows(records)
+
+  # --- Fit-statistic rows ---
+  stat_rows <- build_stat_rows(records, omit.stat, digits, star.cutoffs, star.char)
+
+  # --- SE notes ---
+  se_labels <- vapply(records, `[[`, character(1L), "se_label")
+  se_notes  <- unique(se_labels)
+
+  # Standard significance note (matches original stargazer)
+  star_note <- paste0(
+    "$^{*}$p$<$", star.cutoffs[1L], "; ",
+    "$^{**}$p$<$", star.cutoffs[2L], "; ",
+    "$^{***}$p$<$", star.cutoffs[3L]
+  )
+
+  list(
+    n_cols        = n_cols,
+    dep_vars      = dep_vars,
+    model_labels  = model_labels,
+    col_numbers   = col_numbers,
+    show_model_row = show_model_row,
+    coef_rows     = coef_rows,
+    fe_rows       = fe_rows,
+    stat_rows     = stat_rows,
+    se_notes      = se_notes,
+    star_note     = star_note,
+    no_space      = no.space
+  )
+}
+
+# ---------------------------------------------------------------------------
+# Coefficient rows
+# ---------------------------------------------------------------------------
+
+build_coef_rows <- function(records, omit, keep, covariate.labels,
+                            digits, star.cutoffs, star.char) {
+  n_cols <- length(records)
+
+  # Union of all covariate names, preserving encounter order
+  all_names <- character(0L)
+  for (rec in records) {
+    new <- setdiff(rec$coef_names, all_names)
+    all_names <- c(all_names, new)
+  }
+
+  # Apply omit / keep filters
+  if (!is.null(omit)) {
+    pattern <- paste(omit, collapse = "|")
+    all_names <- all_names[!grepl(pattern, all_names)]
+  }
+  if (!is.null(keep)) {
+    pattern <- paste(keep, collapse = "|")
+    all_names <- all_names[grepl(pattern, all_names)]
+  }
+
+  # Match original stargazer: move "Constant" to the end
+  const_idx <- which(all_names == "Constant")
+  if (length(const_idx) > 0L) {
+    all_names <- c(all_names[-const_idx], all_names[const_idx])
+  }
+
+  # Build one row per covariate
+  rows <- vector("list", length(all_names))
+  for (j in seq_along(all_names)) {
+    nm      <- all_names[[j]]
+    vals    <- character(n_cols)
+    se_vals <- character(n_cols)
+
+    for (i in seq_len(n_cols)) {
+      rec <- records[[i]]
+      idx <- match(nm, rec$coef_names)
+      if (is.na(idx)) {
+        vals[i]    <- ""
+        se_vals[i] <- ""
+      } else {
+        val_str  <- format_num(rec$coefs[idx], digits)
+        val_str  <- add_stars(val_str, rec$pval[idx], star.cutoffs, star.char)
+        vals[i]    <- val_str
+        se_vals[i] <- format_se(rec$se[idx], digits)
+      }
+    }
+
+    label <- latex_escape(nm)  # default display name
+    rows[[j]] <- list(label = label, values = vals, se_values = se_vals)
+  }
+
+  # Apply covariate.labels (positional replacement)
+  if (!is.null(covariate.labels)) {
+    n_labels <- min(length(covariate.labels), length(rows))
+    for (j in seq_len(n_labels)) {
+      rows[[j]]$label <- covariate.labels[[j]]
+    }
+  }
+
+  rows
+}
+
+# ---------------------------------------------------------------------------
+# Fixed-effects indicator rows
+# ---------------------------------------------------------------------------
+
+build_fe_rows <- function(records) {
+  # Collect all unique FE variable names in encounter order
+  all_fes <- character(0L)
+  for (rec in records) {
+    new <- setdiff(rec$fixed_effects, all_fes)
+    all_fes <- c(all_fes, new)
+  }
+  if (length(all_fes) == 0L) return(list())
+
+  n_cols <- length(records)
+  rows   <- vector("list", length(all_fes))
+
+  for (j in seq_along(all_fes)) {
+    fe_var <- all_fes[[j]]
+    label  <- format_fe_label(fe_var)
+    values <- vapply(records, function(rec) {
+      if (fe_var %in% rec$fixed_effects) "Yes" else "No"
+    }, character(1L))
+    rows[[j]] <- list(label = label, values = values, se_values = NULL)
+  }
+
+  rows
+}
+
+# ---------------------------------------------------------------------------
+# Fit-statistic rows
+# ---------------------------------------------------------------------------
+
+# Stat identifiers recognised by omit.stat / keep.stat:
+#   "n"      Observations
+#   "r2"     R² (or within R² for FE models)
+#   "adj.r2" Adjusted R² (or adjusted within R²)
+#   "sigma"  Residual Std. Error  (lm only)
+#   "f"      F Statistic          (lm only)
+#   "pr2"    Pseudo R²            (GLM)
+#   "ll"     Log-likelihood       (GLM)
+
+build_stat_rows <- function(records, omit.stat, digits, star.cutoffs, star.char) {
+  n_cols <- length(records)
+
+  # Determine which model types are present
+  has_lm  <- any(vapply(records, function(r) {
+    t <- r$fit$type; is.null(t) || t == "ols"
+  }, logical(1L)))
+  has_glm <- any(vapply(records, function(r) {
+    identical(r$fit$type, "glm")
+  }, logical(1L)))
+
+  should_show <- function(id) {
+    if (is.null(omit.stat)) return(TRUE)
+    !any(omit.stat == id)
+  }
+
+  rows <- list()
+
+  # Observations
+  if (should_show("n")) {
+    vals <- vapply(records, function(r) format_nobs(r$nobs), character(1L))
+    rows <- c(rows, list(list(label = "Observations", values = vals, se_values = NULL)))
+  }
+
+  # Helper: safely get a numeric field from fit, returning NA if missing
+  fit_val <- function(fit, field) {
+    v <- fit[[field]]
+    if (is.null(v) || length(v) == 0L) NA_real_ else v
+  }
+
+  # R² (lm / OLS without absorbed FEs)
+  if (should_show("r2")) {
+    vals <- vapply(records, function(r) {
+      fit <- r$fit
+      # Use plain r2 only for lm models where wr2 is NA
+      if (identical(fit$type, "ols")) {
+        wr2 <- fit_val(fit, "wr2")
+        v   <- if (is.na(wr2)) fit_val(fit, "r2") else NA_real_
+      } else {
+        v <- NA_real_
+      }
+      if (is.na(v)) "" else formatC(v, digits = digits, format = "f")
+    }, character(1L))
+    if (any(vals != "")) {
+      rows <- c(rows, list(list(label = "R$^{2}$", values = vals, se_values = NULL)))
+    }
+  }
+
+  # Within R² (feols / FE models)
+  if (should_show("r2")) {
+    vals <- vapply(records, function(r) {
+      fit <- r$fit
+      if (identical(fit$type, "ols")) {
+        v <- fit_val(fit, "wr2")
+      } else {
+        v <- NA_real_
+      }
+      if (is.na(v)) "" else formatC(v, digits = digits, format = "f")
+    }, character(1L))
+    if (any(vals != "")) {
+      rows <- c(rows, list(list(
+        label = "Within R$^{2}$", values = vals, se_values = NULL
+      )))
+    }
+  }
+
+  # Adjusted R² (lm only)
+  if (should_show("adj.r2")) {
+    vals <- vapply(records, function(r) {
+      fit <- r$fit
+      if (identical(fit$type, "ols")) {
+        wr2  <- fit_val(fit, "wr2")
+        v    <- if (is.na(wr2)) fit_val(fit, "adj_r2") else NA_real_
+      } else {
+        v <- NA_real_
+      }
+      if (is.na(v)) "" else formatC(v, digits = digits, format = "f")
+    }, character(1L))
+    if (any(vals != "")) {
+      rows <- c(rows, list(list(
+        label = "Adjusted R$^{2}$", values = vals, se_values = NULL
+      )))
+    }
+  }
+
+  # Adjusted Within R² (feols only)
+  if (should_show("adj.r2")) {
+    vals <- vapply(records, function(r) {
+      fit <- r$fit
+      if (identical(fit$type, "ols")) {
+        v <- fit_val(fit, "adj_wr2")
+      } else {
+        v <- NA_real_
+      }
+      if (is.na(v)) "" else formatC(v, digits = digits, format = "f")
+    }, character(1L))
+    if (any(vals != "")) {
+      rows <- c(rows, list(list(
+        label = "Adjusted Within R$^{2}$", values = vals, se_values = NULL
+      )))
+    }
+  }
+
+  # Pseudo R² (GLM models)
+  if (has_glm && should_show("pr2")) {
+    vals <- vapply(records, function(r) {
+      v <- r$fit$pr2
+      if (is.null(v) || is.na(v)) "" else formatC(v, digits = digits, format = "f")
+    }, character(1L))
+    if (any(vals != "")) {
+      rows <- c(rows, list(list(
+        label = "Pseudo R$^{2}$", values = vals, se_values = NULL
+      )))
+    }
+  }
+
+  # Log-likelihood — only shown when explicitly requested via keep.stat
+  # (not in the default stat set; PPML LL values can be very large)
+
+  # Residual Std. Error (lm only)
+  if (should_show("sigma")) {
+    vals <- vapply(records, function(r) {
+      fit <- r$fit
+      if (is.null(fit$sigma) || is.na(fit$sigma)) return("")
+      paste0(formatC(fit$sigma, digits = digits, format = "f"),
+             " (df = ", fit$df_residual, ")")
+    }, character(1L))
+    if (any(vals != "")) {
+      rows <- c(rows, list(list(
+        label = "Residual Std. Error", values = vals, se_values = NULL
+      )))
+    }
+  }
+
+  # F Statistic (lm only)
+  if (should_show("f")) {
+    vals <- vapply(records, function(r) {
+      fit <- r$fit
+      if (is.null(fit$fstat) || is.na(fit$fstat)) return("")
+      fstr <- add_stars(
+        formatC(fit$fstat, digits = digits, format = "f"),
+        fit$fstat_pval, star.cutoffs, star.char
+      )
+      paste0(fstr, " (df = ", fit$fstat_df1, "; ", fit$fstat_df2, ")")
+    }, character(1L))
+    if (any(vals != "")) {
+      rows <- c(rows, list(list(
+        label = "F Statistic", values = vals, se_values = NULL
+      )))
+    }
+  }
+
+  rows
+}
