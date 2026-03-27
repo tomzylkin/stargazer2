@@ -131,7 +131,8 @@ build_latex_header <- function(table_data, column.labels, dep.var.caption) {
   lines <- c(lines, paste0("\\cline{2-", nc + 1L, "} "))
 
   # Dependent variable name(s) — prefixed with spacing command inline
-  if (length(unique(dep_vars)) == 1L) {
+  # Original stargazer: use \multicolumn only when nc > 1 (single column needs no span)
+  if (length(unique(dep_vars)) == 1L && nc > 1L) {
     lines <- c(lines, paste0(
       "\\\\[-1.8ex] & \\multicolumn{", nc, "}{c}{", dep_vars[1L], "} \\\\ "
     ))
@@ -159,10 +160,12 @@ build_latex_header <- function(table_data, column.labels, dep.var.caption) {
     ))
   }
 
-  # Column numbers
-  lines <- c(lines, paste0(
-    "\\\\[-1.8ex] & ", paste(col_numbers, collapse = " & "), "\\\\ "
-  ))
+  # Column numbers: original stargazer suppresses for single-model tables
+  if (nc > 1L) {
+    lines <- c(lines, paste0(
+      "\\\\[-1.8ex] & ", paste(col_numbers, collapse = " & "), "\\\\ "
+    ))
+  }
 
   lines
 }

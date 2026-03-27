@@ -6,6 +6,7 @@
 #   - no vertical bars
 #   - values centred within each column
 #   - column numbers suppressed for single-model tables
+#   - column widths are content-adaptive (matches original stargazer)
 
 #' Render a table_data object as a plain-text string
 #'
@@ -27,21 +28,51 @@ render_ascii <- function(table_data,
 
   nc <- table_data$n_cols
 
-  # Label column width: widest stripped label, minimum 20
+  # --- Content-adaptive column widths (replicates original stargazer algorithm) ---
+
+  # 1. Label column width: max of all row labels and "Note:" prefix
   all_rows <- c(table_data$coef_rows, table_data$fe_rows, table_data$stat_rows)
   label_w  <- max(
     nchar(vapply(all_rows, function(r) strip_latex(r$label), character(1L))),
-    20L, na.rm = TRUE
+    nchar("Note:"),
+    1L, na.rm = TRUE
   )
 
-  # Value column width: 24 per column minimum
-  val_w    <- 24L
-  total_w  <- label_w + nc * val_w
+  # 2. Per-value-column widths: maximum content width for cells in each column
+  note_text <- build_ascii_note(table_data, notes, notes.append)
+
+  col_w <- vapply(seq_len(nc), function(c) {
+    cells <- character(0L)
+    for (row in table_data$coef_rows) {
+      cells <- c(cells, strip_latex(row$values[c]))
+      if (!is.null(row$se_values)) {
+        cells <- c(cells, strip_latex(row$se_values[c]))
+      }
+    }
+    for (row in table_data$fe_rows)   cells <- c(cells, strip_latex(row$values[c]))
+    for (row in table_data$stat_rows) cells <- c(cells, strip_latex(row$values[c]))
+    if (nc > 1L) cells <- c(cells, table_data$col_numbers[c])
+    max(nchar(cells), 1L, na.rm = TRUE)
+  }, integer(1L))
+
+  # 3. Expand column widths so the note fits (note spans all value columns)
+  if (nchar(note_text) > 0L) {
+    note_w   <- nchar(note_text)
+    val_area <- sum(col_w) + nc - 1L  # total width: cols + separators between them
+    while (val_area < note_w) {
+      min_c        <- which.min(col_w)
+      col_w[min_c] <- col_w[min_c] + 1L
+      val_area     <- sum(col_w) + nc - 1L
+    }
+  }
+
+  val_area <- sum(col_w) + nc - 1L   # value-column area width (cols + separators)
+  total_w  <- label_w + 1L + val_area # total table width (label + sep + values)
 
   dbl_line <- strrep("=", total_w)
   sep_line <- strrep("-", total_w)
   # Partial rule spanning only the value-column area (mimics LaTeX \cline)
-  cline    <- paste0(strrep(" ", label_w), strrep("-", nc * val_w))
+  cline    <- paste0(strrep(" ", label_w + 1L), strrep("-", val_area))
 
   lines <- character(0L)
 
@@ -52,21 +83,26 @@ render_ascii <- function(table_data,
 
   lines <- c(lines, dbl_line)
 
-  # --- Dependent variable caption (centred across full width) ---
-  dep_str <- paste(unique(strip_latex(table_data$dep_vars)), collapse = ", ")
-  lines   <- c(lines, centre_in(paste0(dep.var.caption, " ", dep_str), total_w))
-  lines   <- c(lines, cline)
+  # --- Dependent variable caption (centred in value-column area) ---
+  # Original stargazer: caption on its own line, centred over value cols only,
+  # with label area filled by spaces.
+  lines <- c(lines,
+    paste0(strrep(" ", label_w + 1L), centre_in(dep.var.caption, val_area))
+  )
+  lines <- c(lines, cline)
 
-  # --- Dep var name(s) ---
+  # --- Dep var name(s): centred in value-column area ---
   dep_vars <- strip_latex(table_data$dep_vars)
   if (length(unique(dep_vars)) == 1L) {
-    lines <- c(lines, paste0(
-      strrep(" ", label_w),
-      centre_in(dep_vars[1L], nc * val_w)
-    ))
+    lines <- c(lines,
+      paste0(strrep(" ", label_w + 1L), centre_in(dep_vars[1L], val_area))
+    )
   } else {
-    dep_cells <- vapply(dep_vars, function(v) centre_in(v, val_w), character(1L))
-    lines <- c(lines, paste0(strrep(" ", label_w), paste(dep_cells, collapse = "")))
+    dep_cells <- mapply(function(v, w) centre_in(v, w), dep_vars, col_w,
+                        SIMPLIFY = TRUE)
+    lines <- c(lines,
+      paste0(strrep(" ", label_w + 1L), paste(dep_cells, collapse = " "))
+    )
   }
 
   # --- Model-type row (when types or dep vars differ) ---
@@ -79,24 +115,29 @@ render_ascii <- function(table_data,
   }
   if (!is.null(col_labels)) {
     col_labels <- pad_to(col_labels, nc, "")
-    type_cells <- vapply(col_labels, function(v) centre_in(v, val_w), character(1L))
-    lines <- c(lines, paste0(strrep(" ", label_w), paste(type_cells, collapse = "")))
+    type_cells <- mapply(function(v, w) centre_in(v, w), col_labels, col_w,
+                         SIMPLIFY = TRUE)
+    lines <- c(lines,
+      paste0(strrep(" ", label_w + 1L), paste(type_cells, collapse = " "))
+    )
   }
 
   # --- Column numbers: only for multi-model tables ---
   if (nc > 1L) {
-    num_cells <- vapply(table_data$col_numbers, function(v) centre_in(v, val_w),
-                        character(1L))
-    lines <- c(lines, paste0(strrep(" ", label_w), paste(num_cells, collapse = "")))
+    num_cells <- mapply(function(v, w) centre_in(v, w),
+                        table_data$col_numbers, col_w, SIMPLIFY = TRUE)
+    lines <- c(lines,
+      paste0(strrep(" ", label_w + 1L), paste(num_cells, collapse = " "))
+    )
   }
 
   lines <- c(lines, sep_line)
 
   # --- Coefficient rows ---
   for (row in table_data$coef_rows) {
-    lines <- c(lines, format_ascii_row(row$label, row$values, label_w, val_w))
+    lines <- c(lines, format_ascii_row(row$label, row$values, label_w, col_w))
     if (!is.null(row$se_values)) {
-      lines <- c(lines, format_ascii_row("", row$se_values, label_w, val_w))
+      lines <- c(lines, format_ascii_row("", row$se_values, label_w, col_w))
     }
     lines <- c(lines, strrep(" ", total_w))  # blank spacer between covariates
   }
@@ -105,25 +146,24 @@ render_ascii <- function(table_data,
   if (length(table_data$fe_rows) > 0L) {
     lines <- c(lines, sep_line)
     for (row in table_data$fe_rows) {
-      lines <- c(lines, format_ascii_row(row$label, row$values, label_w, val_w))
+      lines <- c(lines, format_ascii_row(row$label, row$values, label_w, col_w))
     }
   }
 
   # --- Fit-statistic rows ---
   lines <- c(lines, sep_line)
   for (row in table_data$stat_rows) {
-    lines <- c(lines, format_ascii_row(row$label, row$values, label_w, val_w))
+    lines <- c(lines, format_ascii_row(row$label, row$values, label_w, col_w))
   }
 
   lines <- c(lines, dbl_line)
 
   # --- Notes ---
-  note_text <- build_ascii_note(table_data, notes, notes.append)
   if (nchar(note_text) > 0L) {
-    # Right-align note content, matching original stargazer style
-    note_prefix <- "Note: "
-    pad <- max(0L, total_w - nchar(note_prefix) - nchar(note_text))
-    lines <- c(lines, paste0(note_prefix, strrep(" ", pad), note_text))
+    # "Note:" left-justified in label column; note text right-justified in value area
+    note_label <- formatC("Note:", width = label_w, flag = "-")
+    note_right <- formatC(note_text, width = val_area)  # right-justified (default)
+    lines <- c(lines, paste0(note_label, " ", note_right))
   }
 
   paste(lines, collapse = "\n")
@@ -139,17 +179,24 @@ strip_latex <- function(x) {
   x <- gsub("\\$<\\$", "<", x)                      # $<$ -> <
   x <- gsub("\\$>\\$", ">", x)                      # $>$ -> >
   x <- gsub("\\$[^$]*\\$", "", x)                   # remaining $...$ math
+  # Un-escape LaTeX special characters (from latex_escape())
+  x <- gsub("\\\\_", "_", x, fixed = FALSE)          # \_ -> _
+  x <- gsub("\\\\%", "%", x, fixed = FALSE)          # \% -> %
+  x <- gsub("\\\\&", "&", x, fixed = FALSE)          # \& -> &
+  x <- gsub("\\\\#", "#", x, fixed = FALSE)          # \# -> #
+  x <- gsub("\\\\textbackslash\\{\\}", "\\", x, fixed = FALSE)  # \textbackslash{} -> \
   x <- gsub("\\\\textit\\{([^}]*)\\}", "\\1", x)    # \textit{x} -> x
   x <- gsub("\\\\[a-zA-Z]+\\{([^}]*)\\}", "\\1", x) # \cmd{x} -> x
   x <- gsub("\\\\[a-zA-Z]+", "", x)                 # bare \cmd
   trimws(x)
 }
 
-format_ascii_row <- function(label, values, label_w, val_w) {
+# format_ascii_row: col_w is a vector of per-column widths (length nc)
+format_ascii_row <- function(label, values, label_w, col_w) {
   label_cell <- formatC(strip_latex(label), width = label_w, flag = "-")
-  val_cells  <- vapply(values, function(v) centre_in(strip_latex(v), val_w),
-                       character(1L))
-  paste0(label_cell, paste(val_cells, collapse = ""))
+  val_cells  <- mapply(function(v, w) centre_in(strip_latex(v), w),
+                       values, col_w, SIMPLIFY = TRUE)
+  paste0(label_cell, " ", paste(val_cells, collapse = " "))
 }
 
 centre_in <- function(text, width) {
