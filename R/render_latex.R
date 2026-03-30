@@ -178,15 +178,7 @@ build_latex_notes <- function(table_data, notes, notes.append, notes.align,
                               notes.label, nc) {
   # Build the note text
   if (notes.append || is.null(notes)) {
-    # Suppress SE labels that carry no useful info for the reader
-    # ("OLS standard errors" is implicit for lm — omit to match original stargazer)
-    informative_se <- Filter(function(x) x != "OLS standard errors",
-                             table_data$se_notes)
-    se_part <- if (length(informative_se) > 0L) {
-      paste(informative_se, collapse = "; ")
-    } else {
-      NULL
-    }
+    se_part   <- format_se_note(table_data$se_notes, table_data$col_numbers)
     star_part <- table_data$star_note
     parts <- c(se_part, star_part, notes)
     parts <- Filter(function(x) !is.null(x) && nchar(x) > 0L, parts)

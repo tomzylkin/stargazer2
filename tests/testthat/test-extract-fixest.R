@@ -209,7 +209,7 @@ test_that("gravity feols: within-R2 is non-NA and in [0,1]", {
   expect_true(rec$fit$wr2 >= 0 & rec$fit$wr2 <= 1)
 })
 
-test_that("gravity fepois: pseudo-R2 is non-NA and in [0,1]", {
+test_that("gravity fepois: squared-correlation R2 is non-NA and in [0,1]", {
   skip_if_not_installed("fixest")
   data("trade", package = "fixest")
   m <- fixest::fepois(
@@ -217,10 +217,25 @@ test_that("gravity fepois: pseudo-R2 is non-NA and in [0,1]", {
     data = trade
   )
   rec <- stargazer2:::extract_model(m)
-  pr2 <- rec$fit$pr2
-  if (!is.na(pr2)) {
-    expect_true(pr2 >= 0 & pr2 <= 1)
-  }
+  # No McFadden pseudo-R2; instead squared-correlation R2
+  expect_null(rec$fit$pr2)
+  r2 <- rec$fit$r2
+  expect_false(is.na(r2))
+  expect_true(r2 >= 0 & r2 <= 1)
+  # Within R2 should also be present (FEs absorbed)
+  expect_false(is.na(rec$fit$wr2))
+})
+
+test_that("gravity fenegbin: theta is present and positive", {
+  skip_if_not_installed("fixest")
+  data("trade", package = "fixest")
+  m <- fixest::fenegbin(
+    Euros ~ log(dist_km) | Origin + Destination + Product + Year,
+    data = trade
+  )
+  rec <- stargazer2:::extract_model(m)
+  expect_false(is.na(rec$fit$theta))
+  expect_gt(rec$fit$theta, 0)
 })
 
 test_that("gravity: all four FEs detected across models", {

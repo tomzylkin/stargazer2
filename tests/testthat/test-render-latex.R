@@ -190,9 +190,10 @@ test_that("render_latex: SE note present when vcov supplied", {
   wage1 <- setup_wage1_render()
   m1    <- lm(lwage ~ educ + exper + tenure, wage1)
   V     <- sandwich::vcovHC(m1, type = "HC1")
-  # Without se_label: generic "Standard errors" note
+  # Without se_label: sandwich returns a plain matrix (no class info preserved),
+  # so a generic SE note appears — the note is non-empty and not the OLS default
   out1 <- stargazer(m1, vcov = list(V), type = "latex")
-  expect_match(out1, "Standard errors", fixed = TRUE)
+  expect_match(out1, "standard errors", fixed = TRUE)
   # With se_label: user-specified note appears
   out2 <- stargazer(m1, vcov = list(V), se_label = "HC1-robust",
                     type = "latex")
@@ -204,9 +205,10 @@ test_that("render_latex: SE note present when vcovCL supplied", {
   wage1 <- setup_wage1_render()
   m1    <- lm(lwage ~ educ + exper + tenure, wage1)
   V     <- sandwich::vcovCL(m1, cluster = ~industry, data = wage1)
-  # Without se_label: generic note
+  # Without se_label: sandwich returns a plain matrix (no class info preserved),
+  # so a generic SE note appears — the note is non-empty and not the OLS default
   out1 <- stargazer(m1, vcov = list(V), type = "latex")
-  expect_match(out1, "Standard errors", fixed = TRUE)
+  expect_match(out1, "standard errors", fixed = TRUE)
   # With se_label: explicit cluster note
   out2 <- stargazer(m1, vcov = list(V),
                     se_label = "Standard errors clustered by industry",

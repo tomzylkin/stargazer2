@@ -74,9 +74,9 @@ format_table <- function(records,
   # --- Fit-statistic rows ---
   stat_rows <- build_stat_rows(records, omit.stat, digits, star.cutoffs, star.char)
 
-  # --- SE notes ---
+  # --- SE notes: keep full per-column vector for grouped note formatting ---
   se_labels <- vapply(records, `[[`, character(1L), "se_label")
-  se_notes  <- unique(se_labels)
+  se_notes  <- se_labels
 
   # Standard significance note (matches original stargazer)
   star_note <- paste0(
@@ -199,25 +199,16 @@ build_fe_rows <- function(records) {
 # Fit-statistic rows
 # ---------------------------------------------------------------------------
 
-# Stat identifiers recognised by omit.stat / keep.stat:
+# Stat identifiers recognised by omit.stat:
 #   "n"      Observations
-#   "r2"     R² (or within R² for FE models)
-#   "adj.r2" Adjusted R² (or adjusted within R²)
+#   "r2"     R² and Within R² (all model types)
+#   "adj.r2" Adjusted R² and Adjusted Within R² (OLS only)
 #   "sigma"  Residual Std. Error  (lm only)
 #   "f"      F Statistic          (lm only)
-#   "pr2"    Pseudo R²            (GLM)
-#   "ll"     Log-likelihood       (GLM)
+#   "theta"  Dispersion parameter (fenegbin only)
 
 build_stat_rows <- function(records, omit.stat, digits, star.cutoffs, star.char) {
   n_cols <- length(records)
-
-  # Determine which model types are present
-  has_lm  <- any(vapply(records, function(r) {
-    t <- r$fit$type; is.null(t) || t == "ols"
-  }, logical(1L)))
-  has_glm <- any(vapply(records, function(r) {
-    identical(r$fit$type, "glm")
-  }, logical(1L)))
 
   should_show <- function(id) {
     if (is.null(omit.stat)) return(TRUE)
@@ -226,29 +217,22 @@ build_stat_rows <- function(records, omit.stat, digits, star.cutoffs, star.char)
 
   rows <- list()
 
-  # Observations
-  if (should_show("n")) {
-    vals <- vapply(records, function(r) format_nobs(r$nobs), character(1L))
-    rows <- c(rows, list(list(label = "Observations", values = vals, se_values = NULL)))
-  }
-
   # Helper: safely get a numeric field from fit, returning NA if missing
   fit_val <- function(fit, field) {
     v <- fit[[field]]
     if (is.null(v) || length(v) == 0L) NA_real_ else v
   }
 
-  # R² (lm / OLS without absorbed FEs)
+  # --- Observations ---
+  if (should_show("n")) {
+    vals <- vapply(records, function(r) format_nobs(r$nobs), character(1L))
+    rows <- c(rows, list(list(label = "Observations", values = vals, se_values = NULL)))
+  }
+
+  # --- R²: overall (lm/feols) or squared-correlation (GLM) ---
   if (should_show("r2")) {
     vals <- vapply(records, function(r) {
-      fit <- r$fit
-      # Use plain r2 only for lm models where wr2 is NA
-      if (identical(fit$type, "ols")) {
-        wr2 <- fit_val(fit, "wr2")
-        v   <- if (is.na(wr2)) fit_val(fit, "r2") else NA_real_
-      } else {
-        v <- NA_real_
-      }
+      v <- fit_val(r$fit, "r2")
       if (is.na(v)) "" else formatC(v, digits = digits, format = "f")
     }, character(1L))
     if (any(vals != "")) {
@@ -256,34 +240,11 @@ build_stat_rows <- function(records, omit.stat, digits, star.cutoffs, star.char)
     }
   }
 
-  # Within R² (feols / FE models)
-  if (should_show("r2")) {
-    vals <- vapply(records, function(r) {
-      fit <- r$fit
-      if (identical(fit$type, "ols")) {
-        v <- fit_val(fit, "wr2")
-      } else {
-        v <- NA_real_
-      }
-      if (is.na(v)) "" else formatC(v, digits = digits, format = "f")
-    }, character(1L))
-    if (any(vals != "")) {
-      rows <- c(rows, list(list(
-        label = "Within R$^{2}$", values = vals, se_values = NULL
-      )))
-    }
-  }
-
-  # Adjusted R² (lm only)
+  # --- Adjusted R² (OLS models only; no standard adjusted form for GLM corr-R²) ---
   if (should_show("adj.r2")) {
     vals <- vapply(records, function(r) {
-      fit <- r$fit
-      if (identical(fit$type, "ols")) {
-        wr2  <- fit_val(fit, "wr2")
-        v    <- if (is.na(wr2)) fit_val(fit, "adj_r2") else NA_real_
-      } else {
-        v <- NA_real_
-      }
+      if (!identical(r$fit$type, "ols")) return("")
+      v <- fit_val(r$fit, "adj_r2")
       if (is.na(v)) "" else formatC(v, digits = digits, format = "f")
     }, character(1L))
     if (any(vals != "")) {
@@ -293,15 +254,24 @@ build_stat_rows <- function(records, omit.stat, digits, star.cutoffs, star.char)
     }
   }
 
-  # Adjusted Within R² (feols only)
+  # --- Within R² (feols with FEs, and GLM with FEs) ---
+  if (should_show("r2")) {
+    vals <- vapply(records, function(r) {
+      v <- fit_val(r$fit, "wr2")
+      if (is.na(v)) "" else formatC(v, digits = digits, format = "f")
+    }, character(1L))
+    if (any(vals != "")) {
+      rows <- c(rows, list(list(
+        label = "Within R$^{2}$", values = vals, se_values = NULL
+      )))
+    }
+  }
+
+  # --- Adjusted Within R² (OLS models with FEs only) ---
   if (should_show("adj.r2")) {
     vals <- vapply(records, function(r) {
-      fit <- r$fit
-      if (identical(fit$type, "ols")) {
-        v <- fit_val(fit, "adj_wr2")
-      } else {
-        v <- NA_real_
-      }
+      if (!identical(r$fit$type, "ols")) return("")
+      v <- fit_val(r$fit, "adj_wr2")
       if (is.na(v)) "" else formatC(v, digits = digits, format = "f")
     }, character(1L))
     if (any(vals != "")) {
@@ -311,23 +281,20 @@ build_stat_rows <- function(records, omit.stat, digits, star.cutoffs, star.char)
     }
   }
 
-  # Pseudo R² (GLM models)
-  if (has_glm && should_show("pr2")) {
+  # --- Theta: negative binomial dispersion parameter ---
+  if (should_show("theta")) {
     vals <- vapply(records, function(r) {
-      v <- r$fit$pr2
-      if (is.null(v) || is.na(v)) "" else formatC(v, digits = digits, format = "f")
+      v <- fit_val(r$fit, "theta")
+      if (is.na(v)) "" else formatC(v, digits = digits, format = "f")
     }, character(1L))
     if (any(vals != "")) {
       rows <- c(rows, list(list(
-        label = "Pseudo R$^{2}$", values = vals, se_values = NULL
+        label = "Theta", values = vals, se_values = NULL
       )))
     }
   }
 
-  # Log-likelihood — only shown when explicitly requested via keep.stat
-  # (not in the default stat set; PPML LL values can be very large)
-
-  # Residual Std. Error (lm only)
+  # --- Residual Std. Error (lm only) ---
   if (should_show("sigma")) {
     vals <- vapply(records, function(r) {
       fit <- r$fit
@@ -342,7 +309,7 @@ build_stat_rows <- function(records, omit.stat, digits, star.cutoffs, star.char)
     }
   }
 
-  # F Statistic (lm only)
+  # --- F Statistic (lm only) ---
   if (should_show("f")) {
     vals <- vapply(records, function(r) {
       fit <- r$fit

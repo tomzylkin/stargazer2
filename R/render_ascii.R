@@ -214,11 +214,8 @@ pad_to <- function(x, n, fill) {
 
 build_ascii_note <- function(table_data, notes, notes.append) {
   if (notes.append || is.null(notes)) {
-    informative_se <- Filter(function(x) x != "OLS standard errors",
-                             table_data$se_notes)
-    se_part   <- if (length(informative_se) > 0L) {
-      paste(informative_se, collapse = "; ")
-    } else NULL
+    se_raw  <- format_se_note(table_data$se_notes, table_data$col_numbers)
+    se_part <- if (!is.null(se_raw)) strip_latex(se_raw) else NULL
     star_part <- strip_latex(table_data$star_note)
     parts <- c(se_part, star_part, notes)
     parts <- Filter(function(x) !is.null(x) && nchar(x) > 0L, parts)

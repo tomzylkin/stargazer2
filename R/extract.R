@@ -234,14 +234,30 @@ fit_stats_fixest <- function(model) {
       type    = "ols"
     )
   } else {
-    # Count / GLM models: pseudo-R² and log-likelihood
+    # Count / GLM models: squared-correlation R², within R², and (for negbin) theta.
+    # McFadden pseudo-R² is omitted — it is scale-dependent for PPML when the
+    # dependent variable is not a count (Green & Santos Silva, Stata Journal 2025).
     r2_vals <- tryCatch(fixest::r2(model), error = function(e) NULL)
-    ll      <- tryCatch(as.numeric(logLik(model)), error = function(e) NA_real_)
+
+    # Squared correlation R² = corr(y, fitted)^2: scale-invariant measure of fit
+    fitted  <- tryCatch(model$fitted.values, error = function(e) NULL)
+    y_vals  <- tryCatch(model$y,             error = function(e) NULL)
+    corr_r2 <- if (!is.null(fitted) && !is.null(y_vals) &&
+                    length(fitted) == length(y_vals) && length(fitted) > 1L) {
+      cor(as.numeric(fitted), as.numeric(y_vals))^2
+    } else NA_real_
+
+    # Theta: negative binomial overdispersion parameter
+    theta <- if (method == "fenegbin") {
+      tryCatch(as.numeric(model$theta), error = function(e) NA_real_)
+    } else NA_real_
+
     list(
       nobs    = n,
-      pr2     = if (!is.null(r2_vals)) unname(r2_vals["pr2"])  else NA_real_,
-      adj_pr2 = if (!is.null(r2_vals)) unname(r2_vals["apr2"]) else NA_real_,
-      ll      = ll,
+      r2      = corr_r2,
+      wr2     = if (!is.null(r2_vals)) unname(r2_vals["wpr2"]) else NA_real_,
+      adj_wr2 = if (!is.null(r2_vals)) unname(r2_vals["wapr2"]) else NA_real_,
+      theta   = theta,
       type    = "glm"
     )
   }
