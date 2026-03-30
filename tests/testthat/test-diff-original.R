@@ -192,3 +192,48 @@ test_that("diff: LaTeX multi-model output (m1-m4) matches original stargazer", {
   report <- diff_report(orig_f, new2_f)
   expect_null(report, label = paste("LaTeX multi-model diff:\n", report))
 })
+
+# ---------------------------------------------------------------------------
+# 5. Summary table ASCII diff test
+# ---------------------------------------------------------------------------
+
+test_that("diff: ASCII summary table matches original stargazer", {
+  wage1 <- setup_wage1_diff()
+  df    <- wage1[, c("lwage", "educ", "exper", "tenure", "female", "married")]
+
+  orig <- capture_original(list(df), type = "text")
+  new2 <- strsplit(stargazer(df, type = "text"), "\n")[[1L]]
+
+  orig_f <- filter_lines(orig)
+  new2_f <- filter_lines(new2)
+
+  report <- diff_report(orig_f, new2_f)
+  expect_null(report, label = paste("ASCII summary diff:\n", report))
+})
+
+# ---------------------------------------------------------------------------
+# 6. Summary table LaTeX diff test
+# ---------------------------------------------------------------------------
+
+test_that("diff: LaTeX summary table matches original stargazer", {
+  wage1 <- setup_wage1_diff()
+  df    <- wage1[, c("lwage", "educ", "exper", "tenure", "female", "married")]
+
+  orig <- capture_original(list(df), type = "latex")
+  new2 <- strsplit(stargazer(df, type = "latex"), "\n")[[1L]]
+
+  normalise_latex <- function(lines) {
+    lines <- lines[!grepl("^%", lines)]
+    lines <- trimws(lines, which = "right")
+    ifelse(grepl("^\\s*$", lines), "", lines)
+  }
+
+  orig_f <- normalise_latex(orig)
+  new2_f <- normalise_latex(new2)
+
+  orig_f <- orig_f[orig_f != "" | cumsum(orig_f != "") > 0L]
+  new2_f <- new2_f[new2_f != "" | cumsum(new2_f != "") > 0L]
+
+  report <- diff_report(orig_f, new2_f)
+  expect_null(report, label = paste("LaTeX summary diff:\n", report))
+})

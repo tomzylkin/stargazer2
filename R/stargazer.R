@@ -51,6 +51,15 @@
 #' @param no.space Logical; suppress blank spacer rows in the table body.
 #'   Default: \code{FALSE}.
 #'
+#' @param summary.stat Character vector; which summary statistics to include
+#'   when \code{stargazer} is called with a \code{data.frame}.  Recognised
+#'   values: \code{"n"}, \code{"mean"}, \code{"sd"}, \code{"min"},
+#'   \code{"max"}, \code{"median"}, \code{"p25"}, \code{"p75"}.
+#'   Default: \code{c("n","mean","sd","min","max")}.
+#' @param median Logical; if \code{TRUE}, add a Median column to summary
+#'   tables.  Equivalent to including \code{"median"} in \code{summary.stat}.
+#'   Default: \code{FALSE}.
+#'
 #' @param vcov List of variance-covariance matrices (one per model, or
 #'   \code{NULL} for a given model to fall back to auto-extraction).  Takes
 #'   priority over \code{se}.  The square root of the diagonal is extracted
@@ -102,6 +111,8 @@ stargazer <- function(...,
                       notes.label      = "\\textit{Note:} ",
                       font.size        = NULL,
                       no.space         = FALSE,
+                      summary.stat     = NULL,
+                      median           = FALSE,
                       vcov             = NULL,
                       se               = NULL,
                       se_label         = NULL,
@@ -110,6 +121,31 @@ stargazer <- function(...,
   models <- list(...)
   if (length(models) == 0L) {
     stop("stargazer: no model objects supplied.", call. = FALSE)
+  }
+
+  # --- Data frame / matrix input: route to summary statistics table ---
+  # Must be checked before the pre-packed list unwrap below, because
+  # data.frame objects are also lists and would otherwise be unpacked.
+  if (length(models) >= 1L &&
+      (is.data.frame(models[[1L]]) || is.matrix(models[[1L]]))) {
+    return(stargazer_summary(
+      data             = models[[1L]],
+      type             = type,
+      title            = title,
+      label            = label,
+      font.size        = font.size,
+      covariate.labels = covariate.labels,
+      omit             = omit,
+      keep             = keep,
+      digits           = digits,
+      summary.stat     = summary.stat,
+      median           = median,
+      notes            = notes,
+      notes.append     = notes.append,
+      notes.align      = notes.align,
+      notes.label      = notes.label,
+      out              = out
+    ))
   }
 
   # Accept a pre-packed list as the first argument (common pattern)
