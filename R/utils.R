@@ -71,7 +71,36 @@ se_label_from_vcov <- function(vcov_mat) {
     }
     return("heteroskedasticity-robust standard errors")
   }
-  "standard errors"
+  "user-specified standard errors"
+}
+
+# Infer a human-readable SE-type label from a fixest_vcov matrix (output of
+# vcov() on a fixest model).  Uses the 'vcov_type' attribute set by fixest.
+se_label_from_fixest_vcov <- function(V) {
+  vt <- attr(V, "vcov_type")
+  if (is.null(vt)) return("OLS standard errors")
+
+  if (vt == "IID") return("OLS standard errors")
+
+  if (vt == "Heteroskedasticity-robust") {
+    return("heteroskedasticity-robust standard errors")
+  }
+
+  if (startsWith(vt, "Clustered (")) {
+    vars_str <- sub("^Clustered \\((.+)\\)$", "\\1", vt)
+    # Clean up internal fixest interaction notation, e.g.
+    # combine_fixef_keep_names(Origin, Destination) -> Origin x Destination
+    vars_str <- gsub(
+      "combine_fixef_keep_names\\(([^,]+),\\s*([^)]+)\\)",
+      "\\1 x \\2", vars_str
+    )
+    # Two-way: "X & Y" -> "X and Y"
+    vars_str <- gsub(" & ", " and ", vars_str, fixed = TRUE)
+    return(paste0("standard errors clustered by ", vars_str))
+  }
+
+  # Other fixest vcov types (Driscoll-Kraay, Bootstrap, …)
+  paste0(tolower(vt), " standard errors")
 }
 
 # Format a fixest FE variable name for display in the table.
@@ -85,33 +114,6 @@ format_fe_label <- function(fe_var) {
     paste0(toupper(substr(p, 1L, 1L)), substr(p, 2L, nchar(p)))
   }, character(1L), USE.NAMES = FALSE)
   paste0(paste(formatted, collapse = " x "), " FE")
-}
-
-# Infer a human-readable SE-type label from a fixest model's call.
-se_label_fixest_model <- function(model) {
-  vcov_arg <- model$call$vcov
-  if (is.null(vcov_arg)) {
-    return("OLS standard errors")
-  }
-  vcov_str <- trimws(deparse(vcov_arg))
-  # Strip surrounding quotes if it was passed as a string literal
-  vcov_str <- gsub('^["\']|["\']$', "", vcov_str)
-
-  if (vcov_str %in% c("iid", "standard", "IID")) {
-    return("OLS standard errors")
-  }
-  if (vcov_str %in% c("hetero", "HC1", "hc1", "robust", "Robust")) {
-    return("heteroskedasticity-robust standard errors")
-  }
-  # Clustering formula: starts with ~
-  if (grepl("^~", vcov_str)) {
-    cluster_vars <- trimws(sub("^~", "", vcov_str))
-    # region^industry -> "region x industry"
-    cluster_vars <- gsub("\\^", " x ", cluster_vars)
-    cluster_vars <- gsub("\\s+", " ", trimws(cluster_vars))
-    return(paste0("standard errors clustered by ", cluster_vars))
-  }
-  "standard errors"
 }
 
 # Build the SE-type portion of the table note.

@@ -55,7 +55,7 @@ extract_model.lm <- function(model, vcov_override = NULL, se_override = NULL, ..
     se_label <- se_label_from_vcov(vcov_override)
   } else if (!is.null(se_override)) {
     se_vals  <- se_override
-    se_label <- "Standard errors"
+    se_label <- "user-specified standard errors"
   } else {
     se_vals  <- sqrt(diag(vcov(model)))
     se_label <- "OLS standard errors"
@@ -122,11 +122,13 @@ extract_model.fixest <- function(model, vcov_override = NULL, se_override = NULL
     se_label <- se_label_from_vcov(vcov_override)
   } else if (!is.null(se_override)) {
     se_vals  <- se_override
-    se_label <- "Standard errors"
+    se_label <- "user-specified standard errors"
   } else {
-    # Use the vcov baked into the model at estimation time
-    se_vals  <- sqrt(diag(vcov(model)))
-    se_label <- se_label_fixest_model(model)
+    # Use the vcov baked into the model at estimation time;
+    # read the vcov_type attribute fixest sets on the returned matrix.
+    V        <- vcov(model)
+    se_vals  <- sqrt(diag(V))
+    se_label <- se_label_from_fixest_vcov(V)
   }
 
   # t / z statistics and p-values
