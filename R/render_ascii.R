@@ -55,17 +55,6 @@ render_ascii <- function(table_data,
     max(nchar(cells), 1L, na.rm = TRUE)
   }, integer(1L))
 
-  # 3. Expand column widths so the note fits (note spans all value columns)
-  if (nchar(note_text) > 0L) {
-    note_w   <- nchar(note_text)
-    val_area <- sum(col_w) + nc - 1L  # total width: cols + separators between them
-    while (val_area < note_w) {
-      min_c        <- which.min(col_w)
-      col_w[min_c] <- col_w[min_c] + 1L
-      val_area     <- sum(col_w) + nc - 1L
-    }
-  }
-
   val_area <- sum(col_w) + nc - 1L   # value-column area width (cols + separators)
   total_w  <- label_w + 1L + val_area # total table width (label + sep + values)
 
@@ -160,9 +149,13 @@ render_ascii <- function(table_data,
 
   # --- Notes ---
   if (nchar(note_text) > 0L) {
-    # "Note:" left-justified in label column; note text right-justified in value area
+    # "Note:" left-justified in label column.
+    # Note text right-justified within val_area when it fits; if the note is
+    # wider than the content columns it extends beyond the table border rather
+    # than inflating column widths.
     note_label <- formatC("Note:", width = label_w, flag = "-")
-    note_right <- formatC(note_text, width = val_area)  # right-justified (default)
+    note_fmt_w <- max(val_area, nchar(note_text))
+    note_right <- formatC(note_text, width = note_fmt_w)
     lines <- c(lines, paste0(note_label, " ", note_right))
   }
 
