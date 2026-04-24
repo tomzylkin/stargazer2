@@ -149,14 +149,18 @@ render_ascii <- function(table_data,
 
   # --- Notes ---
   if (nchar(note_text) > 0L) {
-    # "Note:" left-justified in label column.
-    # Note text right-justified within val_area when it fits; if the note is
-    # wider than the content columns it extends beyond the table border rather
-    # than inflating column widths.
-    note_label <- formatC("Note:", width = label_w, flag = "-")
-    note_fmt_w <- max(val_area, nchar(note_text))
-    note_right <- formatC(note_text, width = note_fmt_w)
-    lines <- c(lines, paste0(note_label, " ", note_right))
+    # "Note:" left-justified in label column; note text word-wrapped to fit
+    # within total_w, with continuation lines indented to align with the
+    # start of the first note line (label_w + 2 spaces).
+    note_indent <- label_w + 1L          # chars before the note text begins
+    note_w      <- total_w - note_indent # available width for note text
+    wrapped     <- wrap_note(note_text, note_w)
+    note_label  <- formatC("Note:", width = label_w, flag = "-")
+    indent_str  <- strrep(" ", note_indent)
+    for (i in seq_along(wrapped)) {
+      prefix <- if (i == 1L) paste0(note_label, " ") else paste0(indent_str, " ")
+      lines  <- c(lines, paste0(prefix, wrapped[i]))
+    }
   }
 
   paste(lines, collapse = "\n")
@@ -216,4 +220,25 @@ build_ascii_note <- function(table_data, notes, notes.append) {
   } else {
     paste(notes, collapse = "; ")
   }
+}
+
+# Word-wrap note text to at most `width` characters per line, breaking only
+# at space boundaries.  Returns a character vector of wrapped lines.
+# If a single token exceeds `width` it is placed on its own line unbroken.
+wrap_note <- function(text, width) {
+  if (nchar(text) <= width) return(text)
+  tokens <- strsplit(text, " ", fixed = TRUE)[[1L]]
+  lines  <- character(0L)
+  cur    <- ""
+  for (tok in tokens) {
+    candidate <- if (nchar(cur) == 0L) tok else paste0(cur, " ", tok)
+    if (nchar(candidate) <= width) {
+      cur <- candidate
+    } else {
+      if (nchar(cur) > 0L) lines <- c(lines, cur)
+      cur <- tok   # start new line with this token even if it overflows
+    }
+  }
+  if (nchar(cur) > 0L) lines <- c(lines, cur)
+  lines
 }

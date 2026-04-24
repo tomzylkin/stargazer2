@@ -74,9 +74,13 @@ filter_lines <- function(lines, drop_whitespace_only = FALSE,
     lines <- trimws(lines, which = "right")      # trailing spaces don't matter
   }
   if (drop_note) {
-    # ASCII: note line starts with "Note:"
-    # LaTeX: note line contains \multicolumn and "Note:"
-    lines <- lines[!grepl("Note:", lines, fixed = TRUE)]
+    # LaTeX: drop lines containing "Note:"
+    # ASCII: drop the closing === border and everything after it, since the
+    # note (potentially multi-line after word-wrapping) always follows it.
+    latex_note <- grepl("Note:", lines, fixed = TRUE)
+    last_dbl   <- max(c(0L, which(grepl("^={3,}", lines))))
+    after_dbl  <- seq_len(length(lines)) > last_dbl
+    lines <- lines[!(latex_note | after_dbl)]
   }
   if (normalise_ws) {
     # Collapse runs of spaces to one and trim; makes table-width differences
