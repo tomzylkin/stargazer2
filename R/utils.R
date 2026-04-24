@@ -58,7 +58,11 @@ se_label_from_vcov <- function(vcov_mat) {
     cl <- attr(vcov_mat, "cluster")
     if (!is.null(cl)) {
       vars <- if (inherits(cl, "formula")) all.vars(cl) else as.character(cl)
-      cl_str <- paste(vars, collapse = " x ")
+      cl_str <- if (length(vars) == 1L) {
+        vars
+      } else {
+        paste0(paste(vars[-length(vars)], collapse = ", "), " and ", vars[length(vars)])
+      }
       return(paste0("standard errors clustered by ", cl_str))
     }
     return("clustered standard errors")
@@ -74,13 +78,28 @@ se_label_from_vcov <- function(vcov_mat) {
   "user-specified standard errors"
 }
 
+# Return the appropriate SE label for a fixest IID (default) vcov,
+# which varies by model type: feols -> OLS, fepois -> heteroskedasticity-robust,
+# fenegbin/feglm -> MLE.
+fixest_iid_se_label <- function(method) {
+  switch(method,
+    feols    = "OLS standard errors",
+    fepois   = "Heteroskedasticity-robust standard errors",
+    fenegbin = "MLE standard errors",
+    feglm    = "MLE standard errors",
+    "OLS standard errors"
+  )
+}
+
 # Infer a human-readable SE-type label from a fixest_vcov matrix (output of
 # vcov() on a fixest model).  Uses the 'vcov_type' attribute set by fixest.
-se_label_from_fixest_vcov <- function(V) {
+# method: the fixest estimation method string (model$method), used to
+# distinguish OLS / Poisson / NegBin defaults when vcov_type == "IID".
+se_label_from_fixest_vcov <- function(V, method = "feols") {
   vt <- attr(V, "vcov_type")
-  if (is.null(vt)) return("OLS standard errors")
+  if (is.null(vt)) return(fixest_iid_se_label(method))
 
-  if (vt == "IID") return("OLS standard errors")
+  if (vt == "IID") return(fixest_iid_se_label(method))
 
   if (vt == "Heteroskedasticity-robust") {
     return("heteroskedasticity-robust standard errors")
@@ -121,16 +140,13 @@ format_fe_label <- function(fe_var) {
 # se_labels:   character vector of length n_cols (one per column)
 # col_numbers: character vector like c("(1)", "(2)", ...)
 #
-# Returns NULL when all columns use OLS standard errors (implicit, suppress).
 # Returns a single string when all columns share the same SE type.
 # Returns a grouped per-column string when SE types differ across columns,
 # e.g. "(1) HC1 heteroskedasticity-robust standard errors; (2)-(3) OLS standard errors".
 format_se_note <- function(se_labels, col_numbers) {
   # All columns share the same SE type
   if (length(unique(se_labels)) == 1L) {
-    label <- se_labels[1L]
-    if (label == "OLS standard errors") return(NULL)
-    return(label)
+    return(se_labels[1L])
   }
 
   # Multiple SE types: group consecutive columns with the same SE type

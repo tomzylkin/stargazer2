@@ -150,11 +150,19 @@ stargazer <- function(...,
 
   # Accept a pre-packed list as the first argument (common pattern)
   if (length(models) == 1L && is.list(models[[1L]]) &&
-      !inherits(models[[1L]], c("lm", "fixest"))) {
+      !inherits(models[[1L]], c("lm", "fixest", "feglm"))) {
     models <- models[[1L]]
   }
 
   n_models <- length(models)
+
+  # --- Capture vcov expression before evaluation for SE label parsing ---
+  # sandwich::vcovHC / vcovCL return plain matrices with no class or call
+  # attribute, so we parse the unevaluated call to detect SE type.
+  vcov_parsed_labels <- parse_vcov_labels(
+    match.call(expand.dots = FALSE)$vcov,
+    n_models
+  )
 
   # --- Validate and normalise vcov / se lists ---
   vcov_list <- normalise_override_list(vcov, n_models, "vcov")
@@ -168,6 +176,15 @@ stargazer <- function(...,
       vcov_override = vcov_list[[i]],
       se_override   = se_list[[i]]
     )
+  }
+
+  # --- Apply vcov-expression-parsed SE labels (before user se_label override) ---
+  # Replaces "user-specified standard errors" when the vcov call is recognisable.
+  for (i in seq_len(n_models)) {
+    lbl <- vcov_parsed_labels[i]
+    if (!is.na(lbl) && records[[i]]$se_label == "user-specified standard errors") {
+      records[[i]]$se_label <- lbl
+    }
   }
 
   # --- Apply se_label override ---
@@ -244,6 +261,70 @@ stargazer <- function(...,
   }
 
   invisible(output)
+}
+
+# ---------------------------------------------------------------------------
+# Internal helpers: parse SE type labels from unevaluated vcov expressions
+# ---------------------------------------------------------------------------
+
+# Parse the unevaluated vcov argument expression (as returned by match.call())
+# and return a character vector of length n_models with recognised SE labels,
+# or NA where the call is not recognisable.
+parse_vcov_labels <- function(vcov_expr, n_models) {
+  labels <- rep(NA_character_, n_models)
+  if (is.null(vcov_expr)) return(labels)
+
+  # Bare matrix (single-model call without list() wrapper)
+  if (!is.call(vcov_expr) ||
+      !identical(as.character(vcov_expr[[1L]]), "list")) {
+    labels[1L] <- parse_single_vcov_call(vcov_expr)
+    return(labels)
+  }
+
+  # list(expr1, expr2, ...) — iterate over elements
+  elems <- as.list(vcov_expr)[-1L]   # drop the 'list' symbol
+  for (i in seq_along(elems)) {
+    if (i > n_models) break
+    labels[i] <- parse_single_vcov_call(elems[[i]])
+  }
+  labels
+}
+
+# Parse a single unevaluated vcov call expression and return a human-readable
+# SE label, or NA_character_ if the call is unrecognised.
+parse_single_vcov_call <- function(expr) {
+  if (is.null(expr)) return(NA_character_)
+  if (is.name(expr) && identical(as.character(expr), "NULL")) return(NA_character_)
+  if (!is.call(expr)) return(NA_character_)
+
+  fn <- as.character(expr[[1L]])
+  fn <- sub("^.*::", "", fn)   # strip namespace prefix (e.g. sandwich::vcovHC)
+
+  if (fn == "vcovHC") {
+    type_arg <- expr[["type"]]
+    if (!is.null(type_arg)) {
+      return(paste0(as.character(type_arg),
+                    " heteroskedasticity-robust standard errors"))
+    }
+    return("heteroskedasticity-robust standard errors")
+  }
+
+  if (fn == "vcovCL") {
+    cluster_arg <- expr[["cluster"]]
+    if (!is.null(cluster_arg)) {
+      vars <- all.vars(cluster_arg)
+      cl_str <- if (length(vars) == 1L) {
+        vars
+      } else {
+        paste0(paste(vars[-length(vars)], collapse = ", "),
+               " and ", vars[length(vars)])
+      }
+      return(paste0("standard errors clustered by ", cl_str))
+    }
+    return("clustered standard errors")
+  }
+
+  NA_character_
 }
 
 # ---------------------------------------------------------------------------

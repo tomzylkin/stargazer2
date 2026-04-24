@@ -128,7 +128,8 @@ extract_model.fixest <- function(model, vcov_override = NULL, se_override = NULL
     # read the vcov_type attribute fixest sets on the returned matrix.
     V        <- vcov(model)
     se_vals  <- sqrt(diag(V))
-    se_label <- se_label_from_fixest_vcov(V)
+    method   <- if (!is.null(model$method)) model$method else "feols"
+    se_label <- se_label_from_fixest_vcov(V, method = method)
   }
 
   # t / z statistics and p-values
@@ -163,6 +164,88 @@ extract_model.fixest <- function(model, vcov_override = NULL, se_override = NULL
 }
 
 # ---------------------------------------------------------------------------
+# alpaca feglm method
+# ---------------------------------------------------------------------------
+
+extract_model.feglm <- function(model, vcov_override = NULL, se_override = NULL, ...) {
+  if (!requireNamespace("alpaca", quietly = TRUE)) {
+    stop("Package 'alpaca' is required but not installed.", call. = FALSE)
+  }
+
+  coefs      <- coef(model)
+  coef_names <- names(coefs)
+
+  # --- Standard errors (three-tier precedence) ---
+  if (!is.null(vcov_override)) {
+    se_vals  <- sqrt(diag(vcov_override))
+    se_label <- se_label_from_vcov(vcov_override)
+  } else if (!is.null(se_override)) {
+    se_vals  <- se_override
+    se_label <- "user-specified standard errors"
+  } else {
+    V        <- vcov(model)
+    se_vals  <- sqrt(diag(V))
+    se_label <- "MLE standard errors"
+  }
+
+  # z-statistics and two-sided p-values (GLM uses asymptotic normal)
+  tstat <- unname(coefs) / unname(se_vals)
+  pvals <- 2 * pnorm(-abs(tstat))
+
+  # --- Model label from family / link ---
+  fam <- model$family$family
+  lnk <- model$family$link
+  model_label <- if (identical(fam, "binomial") && identical(lnk, "logit")) {
+    "Logit"
+  } else if (identical(fam, "binomial") && identical(lnk, "probit")) {
+    "Probit"
+  } else if (identical(fam, "poisson")) {
+    "Poisson"
+  } else {
+    paste0(toupper(substr(fam, 1L, 1L)), substr(fam, 2L, nchar(fam)),
+           " (", lnk, ")")
+  }
+
+  # --- Fixed effects: names of lvls.k ---
+  fixed_effects <- names(model$lvls.k)
+  if (is.null(fixed_effects)) fixed_effects <- character(0L)
+
+  # --- Dependent variable ---
+  dep_var <- deparse(formula(model)[[2L]])
+
+  # --- Observations ---
+  n_obs <- as.integer(model$nobs[["nobs"]])
+
+  # --- Fit statistics: squared-correlation R² = cor(y, fitted)² ---
+  fitted_vals <- tryCatch(fitted(model), error = function(e) NULL)
+  y_vals      <- tryCatch(model$data[[dep_var]], error = function(e) NULL)
+  corr_r2 <- if (!is.null(fitted_vals) && !is.null(y_vals) &&
+                  length(fitted_vals) == length(y_vals) && length(fitted_vals) > 1L) {
+    cor(as.numeric(fitted_vals), as.numeric(y_vals))^2
+  } else NA_real_
+
+  fit <- list(
+    nobs = n_obs,
+    r2   = corr_r2,
+    type = "glm"
+  )
+
+  list(
+    coef_names    = coef_names,
+    coefs         = unname(coefs),
+    se            = unname(se_vals),
+    tstat         = tstat,
+    pval          = pvals,
+    nobs          = n_obs,
+    fit           = fit,
+    fixed_effects = fixed_effects,
+    se_label      = se_label,
+    model_label   = model_label,
+    dep_var       = dep_var
+  )
+}
+
+# ---------------------------------------------------------------------------
 # default method — informative error
 # ---------------------------------------------------------------------------
 
@@ -171,7 +254,7 @@ extract_model.default <- function(model, vcov_override = NULL, se_override = NUL
   stop(
     "stargazer2 does not know how to extract results from an object of class: ",
     cls, ".\n",
-    "Supported classes: lm, fixest.",
+    "Supported classes: lm, fixest, feglm (alpaca).",
     call. = FALSE
   )
 }

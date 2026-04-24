@@ -62,12 +62,29 @@ capture_original <- function(models, type = "latex") {
 }
 
 # Filter lines: drop % comment lines (original stargazer header),
-# and optionally treat whitespace-only lines as equivalent.
-filter_lines <- function(lines, drop_whitespace_only = FALSE) {
+# and optionally drop note lines (which intentionally differ: stargazer2
+# always shows the SE type in the note, the original stargazer suppresses
+# the note for default OLS).
+filter_lines <- function(lines, drop_whitespace_only = FALSE,
+                         drop_note = FALSE,
+                         normalise_ws = FALSE) {
   lines <- lines[!grepl("^%", lines)]           # drop % comment header
   lines <- lines[lines != ""]                    # drop leading/trailing blank lines
   if (drop_whitespace_only) {
     lines <- trimws(lines, which = "right")      # trailing spaces don't matter
+  }
+  if (drop_note) {
+    # ASCII: note line starts with "Note:"
+    # LaTeX: note line contains \multicolumn and "Note:"
+    lines <- lines[!grepl("Note:", lines, fixed = TRUE)]
+  }
+  if (normalise_ws) {
+    # Collapse runs of spaces to one and trim; makes table-width differences
+    # (caused by the longer SE note expanding column widths) transparent.
+    lines <- trimws(gsub(" +", " ", lines))
+    # Drop lines that collapse to pure separator characters (===, ---) since
+    # their length is no longer meaningful after whitespace stripping.
+    lines <- lines[!grepl("^[= ]+$|^[- ]+$", lines)]
   }
   lines
 }
@@ -101,8 +118,11 @@ test_that("diff: ASCII single-model output matches original stargazer", {
   orig <- capture_original(list(m1), type = "text")
   new2 <- strsplit(stargazer(m1, type = "text"), "\n")[[1L]]
 
-  orig_f <- filter_lines(orig)
-  new2_f <- filter_lines(new2)
+  # drop_note + normalise_ws: stargazer2 intentionally shows "OLS standard
+  # errors" in the note, which widens the table.  Drop notes and normalise
+  # whitespace so only content (not alignment) is compared.
+  orig_f <- filter_lines(orig, drop_note = TRUE, normalise_ws = TRUE)
+  new2_f <- filter_lines(new2, drop_note = TRUE, normalise_ws = TRUE)
 
   report <- diff_report(orig_f, new2_f)
   expect_null(report, label = paste("ASCII single-model diff:\n", report))
@@ -124,8 +144,8 @@ test_that("diff: ASCII multi-model output (m1-m4) matches original stargazer", {
   orig <- capture_original(list(m1, m2, m3, m4), type = "text")
   new2 <- strsplit(stargazer(m1, m2, m3, m4, type = "text"), "\n")[[1L]]
 
-  orig_f <- filter_lines(orig)
-  new2_f <- filter_lines(new2)
+  orig_f <- filter_lines(orig, drop_note = TRUE, normalise_ws = TRUE)
+  new2_f <- filter_lines(new2, drop_note = TRUE, normalise_ws = TRUE)
 
   report <- diff_report(orig_f, new2_f)
   expect_null(report, label = paste("ASCII multi-model diff:\n", report))
@@ -143,9 +163,11 @@ test_that("diff: LaTeX single-model output matches original stargazer", {
   new2 <- strsplit(stargazer(m1, type = "latex"), "\n")[[1L]]
 
   # Drop % comments; right-strip trailing spaces; treat whitespace-only lines
-  # as equivalent by replacing them with a canonical empty marker.
+  # as equivalent; drop Note: lines (intentional divergence: stargazer2 always
+  # shows SE type in note).
   normalise_latex <- function(lines) {
     lines <- lines[!grepl("^%", lines)]
+    lines <- lines[!grepl("Note:", lines, fixed = TRUE)]
     lines <- trimws(lines, which = "right")
     ifelse(grepl("^\\s*$", lines), "", lines)
   }
@@ -179,6 +201,7 @@ test_that("diff: LaTeX multi-model output (m1-m4) matches original stargazer", {
 
   normalise_latex <- function(lines) {
     lines <- lines[!grepl("^%", lines)]
+    lines <- lines[!grepl("Note:", lines, fixed = TRUE)]
     lines <- trimws(lines, which = "right")
     ifelse(grepl("^\\s*$", lines), "", lines)
   }

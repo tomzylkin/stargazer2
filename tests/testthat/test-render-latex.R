@@ -175,12 +175,12 @@ test_that("render_latex: mixed lm + feols shows FE Yes/No correctly", {
 # SE notes
 # ---------------------------------------------------------------------------
 
-test_that("render_latex: OLS SE note suppressed for lm model (matches original stargazer)", {
+test_that("render_latex: OLS SE note present for lm model", {
   wage1 <- setup_wage1_render()
   m1    <- lm(lwage ~ educ + exper + tenure, wage1)
   out   <- stargazer(m1, type = "latex")
-  # OLS standard errors are implicit for lm — suppressed to match original stargazer
-  expect_false(grepl("OLS standard errors", out, fixed = TRUE))
+  # OLS standard errors are always shown in the note
+  expect_match(out, "OLS standard errors", fixed = TRUE)
   # Significance note still present
   expect_match(out, "p$<$0.1", fixed = TRUE)
 })
