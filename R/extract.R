@@ -246,6 +246,97 @@ extract_model.feglm <- function(model, vcov_override = NULL, se_override = NULL,
 }
 
 # ---------------------------------------------------------------------------
+# alpaca summary.feglm method
+# ---------------------------------------------------------------------------
+#
+# Users obtain alternative SEs from alpaca via:
+#   s <- summary(mod, type = "clustered", cluster = ~X)
+# and then pass s directly to stargazer().  The summary.feglm object
+# contains the coefficient matrix (cm) with the desired SEs already
+# baked in.  SE type is not stored in the object; stargazer() infers it
+# by parsing the unevaluated model expression (see parse_summary_feglm_labels
+# in stargazer.R) and writes the result into se_label before rendering.
+
+extract_model.summary.feglm <- function(model, vcov_override = NULL,
+                                        se_override = NULL, ...) {
+  if (!requireNamespace("alpaca", quietly = TRUE)) {
+    stop("Package 'alpaca' is required but not installed.", call. = FALSE)
+  }
+
+  cm         <- model$cm
+  coef_names <- rownames(cm)
+  coefs      <- cm[, "Estimate"]
+
+  # --- Standard errors (three-tier precedence) ---
+  if (!is.null(vcov_override)) {
+    se_vals  <- sqrt(diag(vcov_override))
+    se_label <- se_label_from_vcov(vcov_override)
+    tstat    <- unname(coefs) / unname(se_vals)
+    pvals    <- 2 * pnorm(-abs(tstat))
+  } else if (!is.null(se_override)) {
+    se_vals  <- se_override
+    se_label <- "user-specified standard errors"
+    tstat    <- unname(coefs) / unname(se_vals)
+    pvals    <- 2 * pnorm(-abs(tstat))
+  } else {
+    # SEs, z-stats, and p-values are already computed by summary.feglm.
+    # se_label is set to a placeholder here; stargazer() overwrites it by
+    # parsing the unevaluated summary() call (parse_summary_feglm_labels).
+    se_vals  <- cm[, "Std. error"]
+    tstat    <- cm[, "z value"]
+    pvals    <- cm[, "Pr(> |z|)"]
+    se_label <- "MLE standard errors"
+  }
+
+  # --- Model label from family / link ---
+  fam <- model$family$family
+  lnk <- model$family$link
+  model_label <- if (identical(fam, "binomial") && identical(lnk, "logit")) {
+    "Logit"
+  } else if (identical(fam, "binomial") && identical(lnk, "probit")) {
+    "Probit"
+  } else if (identical(fam, "poisson")) {
+    "Poisson"
+  } else {
+    paste0(toupper(substr(fam, 1L, 1L)), substr(fam, 2L, nchar(fam)),
+           " (", lnk, ")")
+  }
+
+  # --- Fixed effects: names of lvls.k ---
+  fixed_effects <- names(model$lvls.k)
+  if (is.null(fixed_effects)) fixed_effects <- character(0L)
+
+  # --- Dependent variable ---
+  dep_var <- deparse(model$formula[[2L]])
+
+  # --- Observations ---
+  n_obs <- as.integer(model$nobs[["nobs"]])
+
+  # --- Fit statistics ---
+  # summary.feglm does not retain fitted values, so squared-correlation R²
+  # cannot be computed here.  Leave r2 as NA; the table column will be blank.
+  fit <- list(
+    nobs = n_obs,
+    r2   = NA_real_,
+    type = "glm"
+  )
+
+  list(
+    coef_names    = coef_names,
+    coefs         = unname(coefs),
+    se            = unname(se_vals),
+    tstat         = unname(tstat),
+    pval          = unname(pvals),
+    nobs          = n_obs,
+    fit           = fit,
+    fixed_effects = fixed_effects,
+    se_label      = se_label,
+    model_label   = model_label,
+    dep_var       = dep_var
+  )
+}
+
+# ---------------------------------------------------------------------------
 # default method — informative error
 # ---------------------------------------------------------------------------
 
@@ -254,7 +345,7 @@ extract_model.default <- function(model, vcov_override = NULL, se_override = NUL
   stop(
     "stargazer2 does not know how to extract results from an object of class: ",
     cls, ".\n",
-    "Supported classes: lm, fixest, feglm (alpaca).",
+    "Supported classes: lm, fixest, feglm (alpaca), summary.feglm (alpaca).",
     call. = FALSE
   )
 }

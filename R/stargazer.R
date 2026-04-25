@@ -150,19 +150,22 @@ stargazer <- function(...,
 
   # Accept a pre-packed list as the first argument (common pattern)
   if (length(models) == 1L && is.list(models[[1L]]) &&
-      !inherits(models[[1L]], c("lm", "fixest", "feglm"))) {
+      !inherits(models[[1L]], c("lm", "fixest", "feglm", "summary.feglm"))) {
     models <- models[[1L]]
   }
 
   n_models <- length(models)
 
-  # --- Capture vcov expression before evaluation for SE label parsing ---
-  # sandwich::vcovHC / vcovCL return plain matrices with no class or call
-  # attribute, so we parse the unevaluated call to detect SE type.
-  vcov_parsed_labels <- parse_vcov_labels(
+  # --- Capture unevaluated ... and vcov expressions for SE label parsing ---
+  # sandwich vcov matrices and summary.feglm objects carry no SE type metadata;
+  # we recover it by inspecting the unevaluated call.
+  mc_dots <- match.call(expand.dots = FALSE)$`...`
+
+  vcov_parsed_labels  <- parse_vcov_labels(
     match.call(expand.dots = FALSE)$vcov,
     n_models
   )
+  model_parsed_labels <- parse_summary_feglm_labels(mc_dots, n_models)
 
   # --- Validate and normalise vcov / se lists ---
   vcov_list <- normalise_override_list(vcov, n_models, "vcov")
@@ -178,12 +181,18 @@ stargazer <- function(...,
     )
   }
 
-  # --- Apply vcov-expression-parsed SE labels (before user se_label override) ---
-  # Replaces "user-specified standard errors" when the vcov call is recognisable.
+  # --- Apply expression-parsed SE labels (before user se_label override) ---
+  # vcov labels: replace "user-specified standard errors" when recognisable.
+  # model labels (summary.feglm): replace "MLE standard errors" placeholder.
   for (i in seq_len(n_models)) {
-    lbl <- vcov_parsed_labels[i]
-    if (!is.na(lbl) && records[[i]]$se_label == "user-specified standard errors") {
-      records[[i]]$se_label <- lbl
+    vlbl <- vcov_parsed_labels[i]
+    if (!is.na(vlbl) && records[[i]]$se_label == "user-specified standard errors") {
+      records[[i]]$se_label <- vlbl
+    }
+    mlbl <- model_parsed_labels[i]
+    if (!is.na(mlbl) && records[[i]]$se_label == "MLE standard errors" &&
+        inherits(models[[i]], "summary.feglm")) {
+      records[[i]]$se_label <- mlbl
     }
   }
 
@@ -261,6 +270,72 @@ stargazer <- function(...,
   }
 
   invisible(output)
+}
+
+# ---------------------------------------------------------------------------
+# Internal helpers: parse SE labels from unevaluated model expressions
+# (summary.feglm objects)
+# ---------------------------------------------------------------------------
+
+# Inspect the unevaluated ... expressions and return a character vector of
+# length n_models.  For positions where the expression is a summary() call
+# on a feglm model, return the inferred SE label; otherwise NA_character_.
+parse_summary_feglm_labels <- function(dots_exprs, n_models) {
+  labels <- rep(NA_character_, n_models)
+  if (is.null(dots_exprs) || length(dots_exprs) == 0L) return(labels)
+
+  for (i in seq_len(min(length(dots_exprs), n_models))) {
+    expr <- dots_exprs[[i]]
+    lbl  <- parse_single_summary_feglm_call(expr)
+    if (!is.na(lbl)) labels[i] <- lbl
+  }
+  labels
+}
+
+# Parse one unevaluated model expression.  Returns an SE label string when the
+# expression is a summary() call, NA_character_ otherwise.
+parse_single_summary_feglm_call <- function(expr) {
+  if (!is.call(expr)) return(NA_character_)
+  fn <- as.character(expr[[1L]])
+  fn <- sub("^.*::", "", fn)
+  if (fn != "summary") return(NA_character_)
+
+  type_arg    <- expr[["type"]]
+  cluster_arg <- expr[["cluster"]]
+
+  type_str <- if (is.null(type_arg)) "hessian" else as.character(type_arg)
+
+  if (type_str %in% c("hessian", "")) {
+    return("MLE standard errors")
+  }
+  if (type_str == "outer.product") {
+    return("outer-product standard errors")
+  }
+  if (type_str == "sandwich") {
+    return("heteroskedasticity-robust standard errors")
+  }
+  if (type_str == "clustered") {
+    if (!is.null(cluster_arg)) {
+      vars <- all.vars(cluster_arg)
+      # '^' in alpaca cluster formula means interaction (like fixest)
+      # all.vars() drops the '^' operator and returns bare variable names
+      if (length(vars) == 1L) {
+        return(paste0("standard errors clustered by ", vars))
+      }
+      # Two or more vars: check whether they're interacted (^) or additive (+)
+      cl_dep <- deparse(cluster_arg)
+      if (grepl("\\^", cl_dep)) {
+        cl_str <- paste(vars, collapse = " x ")
+      } else {
+        cl_str <- paste0(paste(vars[-length(vars)], collapse = ", "),
+                         " and ", vars[length(vars)])
+      }
+      return(paste0("standard errors clustered by ", cl_str))
+    }
+    return("clustered standard errors")
+  }
+
+  NA_character_
 }
 
 # ---------------------------------------------------------------------------
