@@ -1,4 +1,6 @@
 export(stargazer)
+export(alpaca_vcovSandwich)
+export(alpaca_vcovCL)
 S3method(extract_model, lm)
 S3method(extract_model, fixest)
 S3method(extract_model, feglm)

@@ -54,6 +54,27 @@ format_nobs <- function(n) {
 # Infer a human-readable SE-type label from a sandwich vcov matrix.
 # Falls back to a generic label if class information is unavailable.
 se_label_from_vcov <- function(vcov_mat) {
+  # alpaca vcov helpers set custom classes so detection is reliable.
+  if (inherits(vcov_mat, "vcovAlpacaSandwich")) {
+    return("heteroskedasticity-robust standard errors")
+  }
+  if (inherits(vcov_mat, "vcovAlpacaCL")) {
+    cl <- attr(vcov_mat, "cluster")
+    if (!is.null(cl)) {
+      vars    <- all.vars(cl)
+      cl_str  <- if (grepl("\\^", deparse(cl))) {
+        paste(vars, collapse = " x ")
+      } else if (length(vars) == 1L) {
+        vars
+      } else {
+        paste0(paste(vars[-length(vars)], collapse = ", "), " and ", vars[length(vars)])
+      }
+      return(paste0("standard errors clustered by ", cl_str))
+    }
+    return("clustered standard errors")
+  }
+  # sandwich::vcovHC / vcovCL (class not set by sandwich itself; handled by
+  # expression parsing in stargazer(), but kept here for documentation).
   if (inherits(vcov_mat, "vcovCL")) {
     cl <- attr(vcov_mat, "cluster")
     if (!is.null(cl)) {
