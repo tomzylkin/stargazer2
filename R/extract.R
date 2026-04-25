@@ -280,12 +280,14 @@ extract_model.summary.feglm <- function(model, vcov_override = NULL,
     pvals    <- 2 * pnorm(-abs(tstat))
   } else {
     # SEs, z-stats, and p-values are already computed by summary.feglm.
-    # se_label is set to a placeholder here; stargazer() overwrites it by
-    # parsing the unevaluated summary() call (parse_summary_feglm_labels).
+    # The SE type is not stored in the object, so we cannot detect it
+    # automatically unless the summary() call was written inline in
+    # stargazer() (which allows expression parsing).  Use a placeholder
+    # that surfaces in the table note; the user can override with se_label=.
     se_vals  <- cm[, "Std. error"]
     tstat    <- cm[, "z value"]
     pvals    <- cm[, "Pr(> |z|)"]
-    se_label <- "MLE standard errors"
+    se_label <- "SE type not detected (use se_label= to specify)"
   }
 
   # --- Model label from family / link ---

@@ -190,7 +190,8 @@ stargazer <- function(...,
       records[[i]]$se_label <- vlbl
     }
     mlbl <- model_parsed_labels[i]
-    if (!is.na(mlbl) && records[[i]]$se_label == "MLE standard errors" &&
+    if (!is.na(mlbl) &&
+        records[[i]]$se_label == "SE type not detected (use se_label= to specify)" &&
         inherits(models[[i]], "summary.feglm")) {
       records[[i]]$se_label <- mlbl
     }

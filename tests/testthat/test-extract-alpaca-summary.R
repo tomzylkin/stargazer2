@@ -152,7 +152,15 @@ note_text <- function(out) {
   gsub("\n[ \t]+", " ", out)
 }
 
-test_that("stargazer: summary.feglm default SE label is 'MLE standard errors'", {
+test_that("stargazer: pre-assigned summary.feglm default note warns SE type unknown", {
+  d    <- setup_alpaca_summary_data()
+  mod  <- alpaca::feglm(y ~ x1 + x2 | grp, d$logit, binomial("logit"))
+  s    <- summary(mod)
+  out  <- note_text(stargazer(s, type = "text"))
+  expect_match(out, "SE type not detected", fixed = TRUE)
+})
+
+test_that("stargazer: inline summary(mod) call resolves to MLE label", {
   d   <- setup_alpaca_summary_data()
   mod <- alpaca::feglm(y ~ x1 + x2 | grp, d$logit, binomial("logit"))
   out <- note_text(stargazer(summary(mod), type = "text"))
