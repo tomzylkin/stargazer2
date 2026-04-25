@@ -71,11 +71,13 @@ render_latex <- function(table_data,
 
   # --- Coefficient rows ---
   lines <- c(lines, "\\hline \\\\[-1.8ex] ")
-  for (row in table_data$coef_rows) {
+  n_coef <- length(table_data$coef_rows)
+  for (i in seq_len(n_coef)) {
+    row <- table_data$coef_rows[[i]]
     lines <- c(lines, make_row(row$label, row$values, indent = TRUE))
     lines <- c(lines, make_row("", row$se_values, indent = TRUE))
-    # Spacer after every covariate pair (matches original stargazer default)
-    if (!table_data$no_space) {
+    # Spacer only between coefficient blocks, not after the last one
+    if (!table_data$no_space && i < n_coef) {
       lines <- c(lines, blank_row())
     }
   }
@@ -86,9 +88,7 @@ render_latex <- function(table_data,
     for (row in table_data$fe_rows) {
       lines <- c(lines, make_row(row$label, row$values))
     }
-    if (!table_data$no_space) {
-      lines <- c(lines, blank_row())
-    }
+    # No blank spacer after FE rows — matches original stargazer behaviour
   }
 
   # --- Fit-statistic rows ---
