@@ -75,7 +75,7 @@ test_that("extract_model.AGGTEobj show.dynamics: returns egt-indexed rows", {
   cs_dyn <- did::aggte(cs_out, type = "dynamic")
   rec    <- stargazer2:::extract_model(cs_dyn, show.dynamics = TRUE)
 
-  expect_equal(rec$coef_names, paste0("t = ", cs_dyn$egt))
+  expect_equal(rec$coef_names, as.character(cs_dyn$egt))
   expect_equal(rec$coefs,      cs_dyn$att.egt, tolerance = tol)
   expect_equal(rec$se,         cs_dyn$se.egt,  tolerance = tol)
   expect_true(rec$use_ci)
@@ -122,7 +122,7 @@ test_that("extract_model.emfx event-study: multi-row output", {
   rec        <- stargazer2:::extract_model(emfx_event)
 
   expect_equal(nrow(emfx_event), length(rec$coefs))
-  expect_equal(rec$coef_names, paste0("t = ", emfx_event$event))
+  expect_equal(rec$coef_names, as.character(emfx_event$event))
   expect_equal(rec$coefs,      emfx_event$estimate,   tolerance = tol)
   expect_equal(rec$se,         emfx_event$std.error,  tolerance = tol)
   expect_true(rec$use_ci)
@@ -180,10 +180,10 @@ test_that("4-column DiD table renders (ASCII and LaTeX) without error", {
   skip_if_not_installed("fixest")
   data("mpdta", package = "did")
 
-  # TWFE
-  twfe <- fixest::feols(
-    lemp ~ lpop + fixest::i(year, first.treat != 0, ref = 2003) |
-      countyreal + year,
+  # TWFE with single post-treatment ATT coefficient
+  mpdta$treated <- as.integer(mpdta$first.treat != 0 & mpdta$year >= mpdta$first.treat)
+  twfe_att <- fixest::feols(
+    lemp ~ lpop + treated | countyreal + year,
     data = mpdta, vcov = ~countyreal
   )
 
@@ -210,14 +210,16 @@ test_that("4-column DiD table renders (ASCII and LaTeX) without error", {
 
   expect_no_error({
     ascii_out <- stargazer2::stargazer(
-      twfe, cs_agg, emfx_mod, st_wrap,
-      type = "text", out = tempfile()
+      twfe_att, cs_agg, emfx_mod, st_wrap,
+      type = "text", omit = "lpop", covariate.labels = "ATT",
+      out = tempfile()
     )
   })
   expect_no_error({
     latex_out <- stargazer2::stargazer(
-      twfe, cs_agg, emfx_mod, st_wrap,
-      type = "latex", out = tempfile()
+      twfe_att, cs_agg, emfx_mod, st_wrap,
+      type = "latex", omit = "lpop", covariate.labels = "ATT",
+      out = tempfile()
     )
   })
 

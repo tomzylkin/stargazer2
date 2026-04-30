@@ -67,8 +67,8 @@ extract_model.AGGTEobj <- function(model, vcov_override = NULL,
   dep_var  <- model$DIDparams$yname
 
   if (show_dyn && identical(model$type, "dynamic")) {
-    # Event-study rows indexed by relative event time
-    coef_names <- paste0("t = ", model$egt)
+    # Event-study rows: use egt values directly as labels (relative event times)
+    coef_names <- as.character(model$egt)
     coefs      <- model$att.egt
     se_vals    <- model$se.egt
   } else {
@@ -129,8 +129,8 @@ extract_model.emfx <- function(model, vcov_override = NULL,
   has_event_col <- "event" %in% names(model)
 
   if (has_event_col && nrow(model) > 1L) {
-    # event-study rows: emfx(mod, type = "event")
-    coef_names <- paste0("t = ", model$event)
+    # event-study rows: emfx(mod, type = "event"); use event values as labels
+    coef_names <- as.character(model$event)
     coefs      <- model$estimate
     se_vals    <- model$std.error
     tstat      <- model$statistic
@@ -148,6 +148,12 @@ extract_model.emfx <- function(model, vcov_override = NULL,
     ci_upper   <- model$conf.high[[1L]]
   }
 
+  # Fixed effects: pull from the underlying fixest model (cohort + time FEs)
+  fixed_effects <- tryCatch(
+    get_fixef_vars(me_internal@model),
+    error = function(e) character(0L)
+  )
+
   list(
     coef_names    = coef_names,
     coefs         = coefs,
@@ -159,7 +165,7 @@ extract_model.emfx <- function(model, vcov_override = NULL,
     use_ci        = TRUE,
     nobs          = nobs_val,
     fit           = list(type = "did", nobs = nobs_val),
-    fixed_effects = character(0L),
+    fixed_effects = fixed_effects,
     se_label      = "95% confidence intervals",
     model_label   = "Extended TWFE",
     dep_var       = dep_var

@@ -52,6 +52,11 @@ render_ascii <- function(table_data,
     for (row in table_data$fe_rows)   cells <- c(cells, strip_latex(row$values[c]))
     for (row in table_data$stat_rows) cells <- c(cells, strip_latex(row$values[c]))
     if (nc > 1L) cells <- c(cells, table_data$col_numbers[c])
+    # Include header labels so wide model/dep-var names expand col_w enough
+    # to prevent CI bracket strings from being truncated or misaligned.
+    cells <- c(cells,
+               strip_latex(table_data$model_labels[c]),
+               strip_latex(table_data$dep_vars[c]))
     max(nchar(cells), 1L, na.rm = TRUE)
   }, integer(1L))
 
