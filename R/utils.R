@@ -46,6 +46,13 @@ format_se <- function(x, digits) {
   paste0("(", formatC(x, digits = digits, format = "f"), ")")
 }
 
+# Format a 95% CI in brackets: "[$-$0.075, $-$0.026]".
+# Uses LaTeX math-mode negative sign via format_num().
+format_ci <- function(lo, hi, digits) {
+  if (is.na(lo) || is.na(hi)) return("")
+  paste0("[", format_num(lo, digits), ", ", format_num(hi, digits), "]")
+}
+
 # Format an observation count with a thousands separator.
 format_nobs <- function(n) {
   format(n, big.mark = ",", scientific = FALSE, trim = TRUE)

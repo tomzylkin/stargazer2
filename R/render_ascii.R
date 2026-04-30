@@ -213,8 +213,9 @@ build_ascii_note <- function(table_data, notes, notes.append) {
   if (notes.append || is.null(notes)) {
     se_raw  <- format_se_note(table_data$se_notes, table_data$col_numbers)
     se_part <- if (!is.null(se_raw)) strip_latex(se_raw) else NULL
+    ci_part <- table_data$ci_bracket_note   # plain text; no LaTeX stripping needed
     star_part <- strip_latex(table_data$star_note)
-    parts <- c(se_part, star_part, notes)
+    parts <- c(se_part, ci_part, star_part, notes)
     parts <- Filter(function(x) !is.null(x) && nchar(x) > 0L, parts)
     paste(parts, collapse = "; ")
   } else {

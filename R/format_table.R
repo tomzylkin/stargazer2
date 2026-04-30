@@ -85,18 +85,28 @@ format_table <- function(records,
     "$^{***}$p$<$", star.cutoffs[3L]
   )
 
+  # Mixed SE/CI format legend (only when both types appear in the table)
+  has_ci <- any(vapply(records, function(r) isTRUE(r$use_ci), logical(1L)))
+  has_se <- any(vapply(records, function(r) !isTRUE(r$use_ci), logical(1L)))
+  ci_bracket_note <- if (has_ci && has_se) {
+    "() standard errors; [] 95% confidence intervals"
+  } else {
+    NULL
+  }
+
   list(
-    n_cols        = n_cols,
-    dep_vars      = dep_vars,
-    model_labels  = model_labels,
-    col_numbers   = col_numbers,
-    show_model_row = show_model_row,
-    coef_rows     = coef_rows,
-    fe_rows       = fe_rows,
-    stat_rows     = stat_rows,
-    se_notes      = se_notes,
-    star_note     = star_note,
-    no_space      = no.space
+    n_cols          = n_cols,
+    dep_vars        = dep_vars,
+    model_labels    = model_labels,
+    col_numbers     = col_numbers,
+    show_model_row  = show_model_row,
+    coef_rows       = coef_rows,
+    fe_rows         = fe_rows,
+    stat_rows       = stat_rows,
+    se_notes        = se_notes,
+    star_note       = star_note,
+    ci_bracket_note = ci_bracket_note,
+    no_space        = no.space
   )
 }
 
@@ -148,7 +158,11 @@ build_coef_rows <- function(records, omit, keep, covariate.labels,
         val_str  <- format_num(rec$coefs[idx], digits)
         val_str  <- add_stars(val_str, rec$pval[idx], star.cutoffs, star.char)
         vals[i]    <- val_str
-        se_vals[i] <- format_se(rec$se[idx], digits)
+        se_vals[i] <- if (isTRUE(rec$use_ci)) {
+          format_ci(rec$ci_lower[idx], rec$ci_upper[idx], digits)
+        } else {
+          format_se(rec$se[idx], digits)
+        }
       }
     }
 

@@ -168,10 +168,15 @@ test_that("diff: LaTeX single-model output matches original stargazer", {
 
   # Drop % comments; right-strip trailing spaces; treat whitespace-only lines
   # as equivalent; drop Note: lines (intentional divergence: stargazer2 always
-  # shows SE type in note).
+  # shows SE type in note); drop blank spacer rows (intentional divergence:
+  # stargazer2 omits the trailing spacer after the last coefficient and after
+  # FE rows, matching cleaner output without redundant blank lines).
   normalise_latex <- function(lines) {
     lines <- lines[!grepl("^%", lines)]
     lines <- lines[!grepl("Note:", lines, fixed = TRUE)]
+    # Blank spacer rows: content is only & cells and \\ (e.g. "  & \\" or
+    # "  & & & & \\" ).  Strip these before comparing.
+    lines <- lines[!grepl("^\\s*(&\\s*)+\\\\\\\\\\s*$", lines)]
     lines <- trimws(lines, which = "right")
     ifelse(grepl("^\\s*$", lines), "", lines)
   }
@@ -206,6 +211,7 @@ test_that("diff: LaTeX multi-model output (m1-m4) matches original stargazer", {
   normalise_latex <- function(lines) {
     lines <- lines[!grepl("^%", lines)]
     lines <- lines[!grepl("Note:", lines, fixed = TRUE)]
+    lines <- lines[!grepl("^\\s*(&\\s*)+\\\\\\\\\\s*$", lines)]
     lines <- trimws(lines, which = "right")
     ifelse(grepl("^\\s*$", lines), "", lines)
   }

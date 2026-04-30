@@ -178,9 +178,10 @@ build_latex_notes <- function(table_data, notes, notes.append, notes.align,
                               notes.label, nc) {
   # Build the note text
   if (notes.append || is.null(notes)) {
-    se_part   <- format_se_note(table_data$se_notes, table_data$col_numbers)
-    star_part <- table_data$star_note
-    parts <- c(se_part, star_part, notes)
+    se_part     <- format_se_note(table_data$se_notes, table_data$col_numbers)
+    ci_part     <- table_data$ci_bracket_note
+    star_part   <- table_data$star_note
+    parts <- c(se_part, ci_part, star_part, notes)
     parts <- Filter(function(x) !is.null(x) && nchar(x) > 0L, parts)
     note_text <- paste(parts, collapse = "; ")
   } else {
