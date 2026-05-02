@@ -75,7 +75,7 @@ test_that("extract_model.AGGTEobj show.dynamics: returns egt-indexed rows", {
   cs_dyn <- did::aggte(cs_out, type = "dynamic")
   rec    <- stargazer2:::extract_model(cs_dyn, show.dynamics = TRUE)
 
-  expect_equal(rec$coef_names, as.character(cs_dyn$egt))
+  expect_equal(rec$coef_names, paste0("t = ", cs_dyn$egt))
   expect_equal(rec$coefs,      cs_dyn$att.egt, tolerance = tol)
   expect_equal(rec$se,         cs_dyn$se.egt,  tolerance = tol)
   expect_true(rec$use_ci)
@@ -92,7 +92,7 @@ test_that("extract_model.emfx: estimate and SE match emfx output", {
 
   etwfe_mod <- etwfe::etwfe(
     fml = lemp ~ lpop, tvar = year, gvar = first.treat,
-    data = mpdta, vcov = ~countyreal
+    ivar = countyreal, data = mpdta, vcov = ~countyreal
   )
   emfx_mod <- etwfe::emfx(etwfe_mod)
   rec      <- stargazer2:::extract_model(emfx_mod)
@@ -122,7 +122,7 @@ test_that("extract_model.emfx event-study: multi-row output", {
   rec        <- stargazer2:::extract_model(emfx_event)
 
   expect_equal(nrow(emfx_event), length(rec$coefs))
-  expect_equal(rec$coef_names, as.character(emfx_event$event))
+  expect_equal(rec$coef_names, paste0("t = ", emfx_event$event))
   expect_equal(rec$coefs,      emfx_event$estimate,   tolerance = tol)
   expect_equal(rec$se,         emfx_event$std.error,  tolerance = tol)
   expect_true(rec$use_ci)
@@ -197,7 +197,7 @@ test_that("4-column DiD table renders (ASCII and LaTeX) without error", {
   # Extended TWFE
   etwfe_mod <- etwfe::etwfe(
     fml = lemp ~ lpop, tvar = year, gvar = first.treat,
-    data = mpdta, vcov = ~countyreal
+    ivar = countyreal, data = mpdta, vcov = ~countyreal
   )
   emfx_mod <- etwfe::emfx(etwfe_mod)
 
@@ -223,8 +223,8 @@ test_that("4-column DiD table renders (ASCII and LaTeX) without error", {
     )
   })
 
-  # ci_bracket_note appears in the mixed table.
+  # Per-column SE note distinguishes CI columns.
   # Normalize whitespace first since ASCII output word-wraps the note.
   ascii_norm <- gsub("\\s+", " ", ascii_out)
-  expect_true(grepl("[] 95% confidence intervals", ascii_norm, fixed = TRUE))
+  expect_true(grepl("95% confidence intervals", ascii_norm, fixed = TRUE))
 })

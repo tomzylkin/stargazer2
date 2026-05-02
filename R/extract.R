@@ -98,6 +98,7 @@ extract_model.lm <- function(model, vcov_override = NULL, se_override = NULL, ..
     nobs          = as.integer(nobs(model)),
     fit           = fit,
     fixed_effects = character(0L),
+    reports_fe    = TRUE,
     se_label      = se_label,
     model_label   = "OLS",
     dep_var       = dep_var
@@ -129,7 +130,8 @@ extract_model.fixest <- function(model, vcov_override = NULL, se_override = NULL
     V        <- vcov(model)
     se_vals  <- sqrt(diag(V))
     method   <- if (!is.null(model$method)) model$method else "feols"
-    se_label <- se_label_from_fixest_vcov(V, method = method)
+    vcov_call <- tryCatch(as.character(model$call$vcov), error = function(e) NULL)
+    se_label <- se_label_from_fixest_vcov(V, method = method, vcov_call = vcov_call)
   }
 
   # t / z statistics and p-values
@@ -157,6 +159,7 @@ extract_model.fixest <- function(model, vcov_override = NULL, se_override = NULL
     nobs          = as.integer(nobs(model)),
     fit           = fit,
     fixed_effects = fixed_effects,
+    reports_fe    = TRUE,
     se_label      = se_label,
     model_label   = model_label,
     dep_var       = dep_var
@@ -239,6 +242,7 @@ extract_model.feglm <- function(model, vcov_override = NULL, se_override = NULL,
     nobs          = n_obs,
     fit           = fit,
     fixed_effects = fixed_effects,
+    reports_fe    = TRUE,
     se_label      = se_label,
     model_label   = model_label,
     dep_var       = dep_var
@@ -332,6 +336,7 @@ extract_model.summary.feglm <- function(model, vcov_override = NULL,
     nobs          = n_obs,
     fit           = fit,
     fixed_effects = fixed_effects,
+    reports_fe    = TRUE,
     se_label      = se_label,
     model_label   = model_label,
     dep_var       = dep_var

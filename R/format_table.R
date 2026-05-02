@@ -16,6 +16,7 @@
 # stat_rows      list of stat_row
 # se_notes       character          unique SE-type descriptions
 # star_note      character          significance-level legend
+# ci_col_widths  integer[n_cols]    minimum col width from CI bracket strings
 #
 # coef_row / fe_row / stat_row: list(label, values, se_values)
 #   values and se_values are character vectors of length n_cols.
@@ -33,6 +34,9 @@
 #' @param records   List of model_record objects from \code{extract_model}.
 #' @param covariate.labels Character vector of display names for covariates,
 #'   applied positionally after \code{omit}/\code{keep} filtering.
+#' @param coef.rename Named character vector mapping raw coefficient names to
+#'   display names before the union is computed (e.g.
+#'   \code{c("year::2004" = "t = -2")}). Applied to all models.
 #' @param omit  Character vector of regex patterns; matching covariates are
 #'   dropped.
 #' @param keep  Character vector of regex patterns; only matching covariates
@@ -45,6 +49,7 @@
 #' @keywords internal
 format_table <- function(records,
                          covariate.labels = NULL,
+                         coef.rename      = NULL,
                          omit             = NULL,
                          keep             = NULL,
                          omit.stat        = NULL,
@@ -65,7 +70,8 @@ format_table <- function(records,
 
   # --- Coefficient rows ---
   coef_rows <- build_coef_rows(
-    records, omit, keep, covariate.labels, digits, star.cutoffs, star.char
+    records, omit, keep, covariate.labels, digits, star.cutoffs, star.char,
+    coef.rename = coef.rename
   )
 
   # --- Fixed-effects indicator rows ---
@@ -86,12 +92,19 @@ format_table <- function(records,
   )
 
   # Mixed SE/CI format legend (only when both types appear in the table)
-  has_ci <- any(vapply(records, function(r) isTRUE(r$use_ci), logical(1L)))
-  has_se <- any(vapply(records, function(r) !isTRUE(r$use_ci), logical(1L)))
-  ci_bracket_note <- if (has_ci && has_se) {
-    "() standard errors; [] 95% confidence intervals"
-  } else {
-    NULL
+
+  # --- Minimum column widths from CI bracket strings ---
+  # format_ci() now uses sprintf() so these widths exactly match the stored
+  # se_values strings.  Computed from raw bounds so that a CI-only record at
+  # the bottom of the coef_rows list (e.g. staggered_result ATT) is accounted
+  # for even before the row-scanning loop in compute_col_widths() reaches it.
+  ci_col_widths <- integer(n_cols)
+  for (i in seq_len(n_cols)) {
+    rec <- records[[i]]
+    if (!isTRUE(rec$use_ci) || length(rec$ci_lower) == 0L) next
+    fmt <- sprintf("[%.*f, %.*f]", digits, rec$ci_lower, digits, rec$ci_upper)
+    w   <- max(nchar(fmt), na.rm = TRUE)
+    ci_col_widths[i] <- max(ci_col_widths[i], w, na.rm = TRUE)
   }
 
   list(
@@ -105,7 +118,7 @@ format_table <- function(records,
     stat_rows       = stat_rows,
     se_notes        = se_notes,
     star_note       = star_note,
-    ci_bracket_note = ci_bracket_note,
+    ci_col_widths   = ci_col_widths,
     no_space        = no.space
   )
 }
@@ -115,8 +128,24 @@ format_table <- function(records,
 # ---------------------------------------------------------------------------
 
 build_coef_rows <- function(records, omit, keep, covariate.labels,
-                            digits, star.cutoffs, star.char) {
+                            digits, star.cutoffs, star.char,
+                            coef.rename = NULL) {
   n_cols <- length(records)
+
+  # Apply coef.rename: rename raw coefficient names before building the union.
+  # This allows different models to share a display name (e.g. "year::2004"
+  # renamed to "t = -2" to align with CS event-study labels "t = -2").
+  if (!is.null(coef.rename)) {
+    old_names <- names(coef.rename)
+    new_names <- unname(coef.rename)
+    for (i in seq_along(records)) {
+      m     <- match(old_names, records[[i]]$coef_names)
+      valid <- which(!is.na(m))
+      if (length(valid) > 0L) {
+        records[[i]]$coef_names[m[valid]] <- new_names[valid]
+      }
+    }
+  }
 
   # Union of all covariate names, preserving encounter order
   all_names <- character(0L)
@@ -133,6 +162,15 @@ build_coef_rows <- function(records, omit, keep, covariate.labels,
   if (!is.null(keep)) {
     pattern <- paste(keep, collapse = "|")
     all_names <- all_names[grepl(pattern, all_names)]
+  }
+
+  # Sort event-time labels ("t = k") numerically so that periods appear in
+  # chronological order even when different estimators omit some periods
+  # (e.g. a reference period in one model that another model shows).
+  t_mask <- grepl("^t = -?\\d+$", all_names)
+  if (any(t_mask)) {
+    t_vals    <- as.integer(sub("^t = ", "", all_names[t_mask]))
+    all_names <- c(all_names[t_mask][order(t_vals)], all_names[!t_mask])
   }
 
   # Match original stargazer: move "Constant" to the end
@@ -178,7 +216,41 @@ build_coef_rows <- function(records, omit, keep, covariate.labels,
     }
   }
 
+  # Merge rows that share the same display label (fix 1).
+  # This handles mixed SE/CI tables where "treated" → "ATT" (TWFE) and
+  # the native "ATT" (DiD estimators) land on separate rows before merging.
+  rows <- merge_same_label_rows(rows)
+
   rows
+}
+
+# Merge rows with identical display labels into a single row by combining
+# non-empty cells.  First non-empty value wins for each column.
+merge_same_label_rows <- function(rows) {
+  if (length(rows) <= 1L) return(rows)
+  label_seen <- character(0L)
+  result     <- list()
+  for (j in seq_along(rows)) {
+    lbl <- rows[[j]]$label
+    k   <- match(lbl, label_seen)
+    if (!is.na(k)) {
+      for (col in seq_along(rows[[j]]$values)) {
+        if (nchar(result[[k]]$values[col]) == 0L &&
+            nchar(rows[[j]]$values[col]) > 0L) {
+          result[[k]]$values[col] <- rows[[j]]$values[col]
+        }
+        if (!is.null(rows[[j]]$se_values) &&
+            nchar(result[[k]]$se_values[col]) == 0L &&
+            nchar(rows[[j]]$se_values[col]) > 0L) {
+          result[[k]]$se_values[col] <- rows[[j]]$se_values[col]
+        }
+      }
+    } else {
+      label_seen <- c(label_seen, lbl)
+      result     <- c(result, list(rows[[j]]))
+    }
+  }
+  result
 }
 
 # ---------------------------------------------------------------------------
@@ -201,7 +273,16 @@ build_fe_rows <- function(records) {
     fe_var <- all_fes[[j]]
     label  <- format_fe_label(fe_var)
     values <- vapply(records, function(rec) {
-      if (fe_var %in% rec$fixed_effects) "Yes" else "No"
+      if (fe_var %in% rec$fixed_effects) {
+        "Yes"
+      } else if (isTRUE(rec$reports_fe)) {
+        # Model uses explicit FE absorption but not this particular variable
+        "No"
+      } else {
+        # Model does not report FEs (e.g. CS, Roth-Sant'Anna):
+        # leave blank rather than showing misleading "No"
+        ""
+      }
     }, character(1L))
     rows[[j]] <- list(label = label, values = values, se_values = NULL)
   }

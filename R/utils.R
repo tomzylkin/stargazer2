@@ -46,11 +46,14 @@ format_se <- function(x, digits) {
   paste0("(", formatC(x, digits = digits, format = "f"), ")")
 }
 
-# Format a 95% CI in brackets: "[$-$0.075, $-$0.026]".
-# Uses LaTeX math-mode negative sign via format_num().
+# Format a 95% CI in brackets: "[-0.075, -0.026]".
+# Uses plain sprintf() so both bounds always have the same number of decimal
+# places regardless of sign or magnitude, and the result is exactly
+# nchar(sprintf("[%%.Xf, %%.Xf]", lo, hi)) characters -- no LaTeX markup.
+# This matches format_se() convention and keeps ci_col_widths exact.
 format_ci <- function(lo, hi, digits) {
   if (is.na(lo) || is.na(hi)) return("")
-  paste0("[", format_num(lo, digits), ", ", format_num(hi, digits), "]")
+  sprintf("[%.*f, %.*f]", digits, lo, digits, hi)
 }
 
 # Format an observation count with a thousands separator.
@@ -123,14 +126,24 @@ fixest_iid_se_label <- function(method) {
 # vcov() on a fixest model).  Uses the 'vcov_type' attribute set by fixest.
 # method: the fixest estimation method string (model$method), used to
 # distinguish OLS / Poisson / NegBin defaults when vcov_type == "IID".
-se_label_from_fixest_vcov <- function(V, method = "feols") {
+se_label_from_fixest_vcov <- function(V, method = "feols", vcov_call = NULL) {
   vt <- attr(V, "vcov_type")
   if (is.null(vt)) return(fixest_iid_se_label(method))
 
   if (vt == "IID") return(fixest_iid_se_label(method))
 
   if (vt == "Heteroskedasticity-robust") {
-    return("heteroskedasticity-robust standard errors")
+    # If the user passed a recognised HC variant string to feols(), preserve it
+    # in the note.  fixest treats "HC1", "HC2", "HC3" as aliases for its
+    # heteroskedasticity-robust estimator but does not record the alias in the
+    # vcov matrix attributes, so we recover it from the model call.
+    hc_str <- if (is.character(vcov_call) && length(vcov_call) == 1L &&
+                  grepl("^HC[0-9]+$", vcov_call, ignore.case = FALSE)) {
+      paste0(vcov_call, " ")
+    } else {
+      ""
+    }
+    return(paste0(hc_str, "heteroskedasticity-robust standard errors"))
   }
 
   if (startsWith(vt, "Clustered (")) {

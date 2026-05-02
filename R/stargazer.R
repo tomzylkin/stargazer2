@@ -24,6 +24,12 @@
 #'   version.
 #' @param covariate.labels Character vector; display names for covariates,
 #'   applied positionally after \code{omit}/\code{keep} filtering.
+#' @param coef.rename Named character vector mapping raw coefficient names to
+#'   new display names before the column union is computed.  Names are the
+#'   existing coefficient names; values are the replacement names.  Useful for
+#'   aligning TWFE event-study year indicators with relative-time labels from
+#'   other estimators, e.g.
+#'   \code{c("year::2004" = "t = -2", "year::2005" = "t = -1")}.
 #' @param omit Character vector; regex patterns — covariates whose names
 #'   match any pattern are excluded from the table.
 #' @param keep Character vector; regex patterns — only covariates whose
@@ -104,6 +110,7 @@ stargazer <- function(...,
                       column.labels    = NULL,
                       column.separate  = NULL,
                       covariate.labels = NULL,
+                      coef.rename      = NULL,
                       omit             = NULL,
                       keep             = NULL,
                       omit.stat        = NULL,
@@ -219,10 +226,17 @@ stargazer <- function(...,
   }
 
   # --- Apply dep.var.labels override ---
+  # dep.var.labels maps to unique dep-var names in order of first occurrence,
+  # matching original stargazer behaviour.  A single label relabels all models
+  # that share the same underlying dep var name.
   if (!is.null(dep.var.labels)) {
-    n_labels <- min(length(dep.var.labels), n_models)
-    for (i in seq_len(n_labels)) {
-      records[[i]]$dep_var <- dep.var.labels[[i]]
+    unique_dvs <- unique(vapply(records, `[[`, character(1L), "dep_var"))
+    n_labels   <- min(length(dep.var.labels), length(unique_dvs))
+    dv_map     <- stats::setNames(dep.var.labels[seq_len(n_labels)],
+                                  unique_dvs[seq_len(n_labels)])
+    for (i in seq_len(n_models)) {
+      dv <- records[[i]]$dep_var
+      if (!is.na(dv_map[dv])) records[[i]]$dep_var <- dv_map[[dv]]
     }
   }
 
@@ -230,6 +244,7 @@ stargazer <- function(...,
   table_data <- format_table(
     records,
     covariate.labels = covariate.labels,
+    coef.rename      = coef.rename,
     omit             = omit,
     keep             = keep,
     omit.stat        = omit.stat,

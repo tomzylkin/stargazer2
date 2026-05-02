@@ -9,6 +9,13 @@
 # The formatting layer renders these as [lower, upper] brackets instead of
 # parenthetical SEs.  Stars are still derived from p-values (computed from
 # the SE), so three levels of significance are preserved.
+#
+# reports_fe convention
+# ---------------------
+# reports_fe = TRUE  -- model uses explicit FE absorption (feols, etwfe).
+#                       The FE indicator section shows "Yes"/"No" for this col.
+# reports_fe = FALSE -- model does not operate via FE absorption (CS, staggered).
+#                       The FE indicator section shows blank for this column.
 
 # ---------------------------------------------------------------------------
 # as_staggered_result(): user-facing wrapper
@@ -67,8 +74,9 @@ extract_model.AGGTEobj <- function(model, vcov_override = NULL,
   dep_var  <- model$DIDparams$yname
 
   if (show_dyn && identical(model$type, "dynamic")) {
-    # Event-study rows: use egt values directly as labels (relative event times)
-    coef_names <- as.character(model$egt)
+    # Event-study rows: use "t = k" labels (relative event times) for
+    # consistency with etwfe event-study output and TWFE event-study models.
+    coef_names <- paste0("t = ", model$egt)
     coefs      <- model$att.egt
     se_vals    <- model$se.egt
   } else {
@@ -100,6 +108,7 @@ extract_model.AGGTEobj <- function(model, vcov_override = NULL,
     nobs          = nobs_val,
     fit           = list(type = "did", nobs = nobs_val),
     fixed_effects = character(0L),
+    reports_fe    = FALSE,
     se_label      = "95% confidence intervals",
     model_label   = "Callaway-Sant'Anna",
     dep_var       = dep_var
@@ -129,8 +138,8 @@ extract_model.emfx <- function(model, vcov_override = NULL,
   has_event_col <- "event" %in% names(model)
 
   if (has_event_col && nrow(model) > 1L) {
-    # event-study rows: emfx(mod, type = "event"); use event values as labels
-    coef_names <- as.character(model$event)
+    # Event-study rows: use "t = k" labels for consistency across estimators
+    coef_names <- paste0("t = ", model$event)
     coefs      <- model$estimate
     se_vals    <- model$std.error
     tstat      <- model$statistic
@@ -148,11 +157,17 @@ extract_model.emfx <- function(model, vcov_override = NULL,
     ci_upper   <- model$conf.high[[1L]]
   }
 
-  # Fixed effects: pull from the underlying fixest model (cohort + time FEs)
-  fixed_effects <- tryCatch(
+  # Fixed effects: read from the underlying fixest model.
+  # Map "first.treat" (cohort variable) to "cohort" for display.
+  # When the etwfe call specifies ivar (unit variable), the underlying model
+  # absorbs unit FEs and that variable will appear in fixef_vars automatically.
+  raw_fes <- tryCatch(
     get_fixef_vars(me_internal@model),
     error = function(e) character(0L)
   )
+  fixed_effects <- vapply(raw_fes, function(fe) {
+    if (identical(fe, "first.treat")) "cohort" else fe
+  }, character(1L), USE.NAMES = FALSE)
 
   list(
     coef_names    = coef_names,
@@ -166,6 +181,7 @@ extract_model.emfx <- function(model, vcov_override = NULL,
     nobs          = nobs_val,
     fit           = list(type = "did", nobs = nobs_val),
     fixed_effects = fixed_effects,
+    reports_fe    = TRUE,
     se_label      = "95% confidence intervals",
     model_label   = "Extended TWFE",
     dep_var       = dep_var
@@ -209,6 +225,7 @@ extract_model.staggered_result <- function(model, vcov_override = NULL,
     nobs          = as.integer(nobs_val),
     fit           = list(type = "did", nobs = as.integer(nobs_val)),
     fixed_effects = character(0L),
+    reports_fe    = FALSE,
     se_label      = "95% confidence intervals",
     model_label   = "Roth-Sant'Anna",
     dep_var       = dep_var

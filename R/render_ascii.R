@@ -7,6 +7,13 @@
 #   - values centred within each column
 #   - column numbers suppressed for single-model tables
 #   - column widths are content-adaptive (matches original stargazer)
+#
+# Width determination is a strict two-pass process:
+#   Pass 1  compute_col_widths() scans EVERY cell across ALL row types
+#           (coef values, SE/CI strings, FE indicators, fit statistics, and
+#           explicit CI bounds from table_data$ci_col_widths) before any
+#           output is produced.
+#   Pass 2  render_ascii() emits lines using the fixed widths from Pass 1.
 
 #' Render a table_data object as a plain-text string
 #'
@@ -28,9 +35,9 @@ render_ascii <- function(table_data,
 
   nc <- table_data$n_cols
 
-  # --- Content-adaptive column widths (replicates original stargazer algorithm) ---
+  # --- PASS 1: determine all column widths before producing any output ------
 
-  # 1. Label column width: max of all row labels and "Note:" prefix
+  # 1a. Label column width: max of all row labels and "Note:" prefix
   all_rows <- c(table_data$coef_rows, table_data$fe_rows, table_data$stat_rows)
   label_w  <- max(
     nchar(vapply(all_rows, function(r) strip_latex(r$label), character(1L))),
@@ -38,30 +45,15 @@ render_ascii <- function(table_data,
     1L, na.rm = TRUE
   )
 
-  # 2. Per-value-column widths: maximum content width for cells in each column
-  note_text <- build_ascii_note(table_data, notes, notes.append)
+  # 1b. Per-value-column widths: complete scan of every cell in every column.
+  col_w <- compute_col_widths(table_data, nc)
 
-  col_w <- vapply(seq_len(nc), function(c) {
-    cells <- character(0L)
-    for (row in table_data$coef_rows) {
-      cells <- c(cells, strip_latex(row$values[c]))
-      if (!is.null(row$se_values)) {
-        cells <- c(cells, strip_latex(row$se_values[c]))
-      }
-    }
-    for (row in table_data$fe_rows)   cells <- c(cells, strip_latex(row$values[c]))
-    for (row in table_data$stat_rows) cells <- c(cells, strip_latex(row$values[c]))
-    if (nc > 1L) cells <- c(cells, table_data$col_numbers[c])
-    # Include header labels so wide model/dep-var names expand col_w enough
-    # to prevent CI bracket strings from being truncated or misaligned.
-    cells <- c(cells,
-               strip_latex(table_data$model_labels[c]),
-               strip_latex(table_data$dep_vars[c]))
-    max(nchar(cells), 1L, na.rm = TRUE)
-  }, integer(1L))
+  note_text <- build_ascii_note(table_data, notes, notes.append)
 
   val_area <- sum(col_w) + nc - 1L   # value-column area width (cols + separators)
   total_w  <- label_w + 1L + val_area # total table width (label + sep + values)
+
+  # --- PASS 2: render using fixed widths ------------------------------------
 
   dbl_line <- strrep("=", total_w)
   sep_line <- strrep("-", total_w)
@@ -172,6 +164,71 @@ render_ascii <- function(table_data,
 }
 
 # ---------------------------------------------------------------------------
+# Pass 1: complete column-width computation
+# ---------------------------------------------------------------------------
+
+# compute_col_widths() is called once before any rendering begins.
+# It scans EVERY cell type to determine the minimum column widths that
+# can accommodate all content without truncation:
+#   - coefficient values (with significance stars)
+#   - SE strings  (parenthesised: "(0.013)")
+#   - CI strings  (bracketed: "[-0.064, -0.019]")
+#   - fixed-effect indicator cells ("Yes" / "No" / "")
+#   - fit-statistic cells
+#   - model labels and dep-var names (in column headers)
+#   - column-number labels "(1)", "(2)", ...
+#   - explicit CI widths precomputed from raw bounds in format_table()
+#     (handles CI rows that appear late in the row list, e.g. a single-ATT
+#      staggered_result row at the bottom of an event-study table)
+compute_col_widths <- function(table_data, nc) {
+  vapply(seq_len(nc), function(c) {
+    cells <- character(0L)
+
+    # Coefficient values and their SE / CI sub-rows
+    for (row in table_data$coef_rows) {
+      cells <- c(cells, strip_latex(row$values[c]))
+      if (!is.null(row$se_values)) {
+        cells <- c(cells, strip_latex(row$se_values[c]))
+      }
+    }
+
+    # Fixed-effects indicator rows
+    for (row in table_data$fe_rows) {
+      cells <- c(cells, strip_latex(row$values[c]))
+    }
+
+    # Fit-statistic rows
+    for (row in table_data$stat_rows) {
+      cells <- c(cells, strip_latex(row$values[c]))
+    }
+
+    # Column-number label (multi-model tables only)
+    if (nc > 1L) cells <- c(cells, table_data$col_numbers[c])
+
+    # Model label and dep-var name in the column header
+    cells <- c(cells,
+               strip_latex(table_data$model_labels[c]),
+               strip_latex(table_data$dep_vars[c]))
+
+    # Maximum content width from scanned cells
+    w <- max(nchar(cells), 1L, na.rm = TRUE)
+
+    # Enforce minimum width from CI bracket precomputation.
+    # ci_col_widths[c] == nchar(format_ci(lo, hi, digits)) for the widest CI
+    # in column c.  Because format_ci() now uses sprintf() directly (no LaTeX
+    # markup), ci_col_widths and the scanned se_values nchar() values are
+    # guaranteed to agree.  The max() here is a safety net for CI rows that
+    # appear late in the row list (e.g. single-ATT at the bottom of a long
+    # event-study table) and may not be reached by the se_values scan above.
+    if (!is.null(table_data$ci_col_widths)) {
+      w <- max(w, table_data$ci_col_widths[c])
+    }
+
+    w
+  }, integer(1L))
+}
+
+# ---------------------------------------------------------------------------
 # ASCII helpers
 # ---------------------------------------------------------------------------
 
@@ -218,9 +275,8 @@ build_ascii_note <- function(table_data, notes, notes.append) {
   if (notes.append || is.null(notes)) {
     se_raw  <- format_se_note(table_data$se_notes, table_data$col_numbers)
     se_part <- if (!is.null(se_raw)) strip_latex(se_raw) else NULL
-    ci_part <- table_data$ci_bracket_note   # plain text; no LaTeX stripping needed
     star_part <- strip_latex(table_data$star_note)
-    parts <- c(se_part, ci_part, star_part, notes)
+    parts <- c(se_part, star_part, notes)
     parts <- Filter(function(x) !is.null(x) && nchar(x) > 0L, parts)
     paste(parts, collapse = "; ")
   } else {
