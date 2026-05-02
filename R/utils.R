@@ -115,7 +115,7 @@ se_label_from_vcov <- function(vcov_mat) {
 fixest_iid_se_label <- function(method) {
   switch(method,
     feols    = "OLS standard errors",
-    fepois   = "Heteroskedasticity-robust standard errors",
+    fepois   = "MLE standard errors",
     fenegbin = "MLE standard errors",
     feglm    = "MLE standard errors",
     "OLS standard errors"
