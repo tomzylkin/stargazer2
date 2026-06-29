@@ -129,6 +129,12 @@ extract_model.fixest <- function(model, vcov_override = NULL, se_override = NULL
     # read the vcov_type attribute fixest sets on the returned matrix.
     V        <- vcov(model)
     se_vals  <- sqrt(diag(V))
+    # Older fixest versions do not attach vcov_type to vcov(); fall back to
+    # coeftable(), which carries it more reliably across versions.
+    if (is.null(attr(V, "vcov_type"))) {
+      ct_vt <- tryCatch(attr(coeftable(model), "vcov_type"), error = function(e) NULL)
+      if (!is.null(ct_vt)) attr(V, "vcov_type") <- ct_vt
+    }
     method   <- if (!is.null(model$method)) model$method else "feols"
     vcov_call <- tryCatch(as.character(model$call$vcov), error = function(e) NULL)
     se_label <- se_label_from_fixest_vcov(V, method = method, vcov_call = vcov_call)
