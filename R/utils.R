@@ -128,7 +128,33 @@ fixest_iid_se_label <- function(method) {
 # distinguish OLS / Poisson / NegBin defaults when vcov_type == "IID".
 se_label_from_fixest_vcov <- function(V, method = "feols", vcov_call = NULL) {
   vt <- attr(V, "vcov_type")
-  if (is.null(vt)) return(fixest_iid_se_label(method))
+  if (is.null(vt)) {
+    # Older fixest versions do not attach vcov_type to the matrix. Fall back to
+    # parsing model$call$vcov (passed in as vcov_call via as.character()).
+    # A formula vcov arg (e.g. ~X^Y) becomes c("~", "X^Y") after as.character().
+    if (is.character(vcov_call) && length(vcov_call) >= 2L &&
+        vcov_call[1L] == "~") {
+      rhs <- trimws(vcov_call[2L])
+      if (grepl("\\^", rhs)) {
+        # Interaction clustering: X^Y -> "X x Y"
+        parts <- trimws(strsplit(rhs, "\\^")[[1L]])
+        return(paste0("standard errors clustered by ", paste(parts, collapse = " x ")))
+      } else {
+        # Two-way (additive) clustering: X + Y -> "X and Y"
+        parts <- trimws(strsplit(rhs, "\\+")[[1L]])
+        return(paste0("standard errors clustered by ", paste(parts, collapse = " and ")))
+      }
+    }
+    if (is.character(vcov_call) && length(vcov_call) == 1L &&
+        grepl("^HC[0-9]+$", vcov_call, ignore.case = FALSE)) {
+      return(paste0(vcov_call, " heteroskedasticity-robust standard errors"))
+    }
+    if (is.character(vcov_call) && length(vcov_call) == 1L &&
+        tolower(vcov_call) %in% c("hetero", "robust")) {
+      return("heteroskedasticity-robust standard errors")
+    }
+    return(fixest_iid_se_label(method))
+  }
 
   if (vt == "IID") return(fixest_iid_se_label(method))
 
