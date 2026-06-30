@@ -48,7 +48,7 @@ render_ascii <- function(table_data,
   # 1b. Per-value-column widths: complete scan of every cell in every column.
   col_w <- compute_col_widths(table_data, nc)
 
-  note_text <- build_ascii_note(table_data, notes, notes.append)
+  note_blocks <- build_ascii_notes(table_data, notes, notes.append)
 
   val_area <- sum(col_w) + nc - 1L   # value-column area width (cols + separators)
   total_w  <- label_w + 1L + val_area # total table width (label + sep + values)
@@ -145,18 +145,22 @@ render_ascii <- function(table_data,
   lines <- c(lines, dbl_line)
 
   # --- Notes ---
-  if (nchar(note_text) > 0L) {
-    # "Note:" left-justified in label column; note text word-wrapped to fit
-    # within total_w, with continuation lines indented to align with the
-    # start of the first note line (label_w + 2 spaces).
+  # Each note block starts on its own line: block 1 is the SE + significance
+  # note; each custom note (from `notes`) is a separate block, matching the
+  # original stargazer's one-note-per-line layout.  "Note:" labels only the
+  # very first line; every other line (continuation or new block) is indented.
+  if (length(note_blocks) > 0L) {
     note_indent <- label_w + 1L          # chars before the note text begins
     note_w      <- total_w - note_indent # available width for note text
-    wrapped     <- wrap_note(note_text, note_w)
     note_label  <- formatC("Note:", width = label_w, flag = "-")
     indent_str  <- strrep(" ", note_indent)
-    for (i in seq_along(wrapped)) {
-      prefix <- if (i == 1L) paste0(note_label, " ") else paste0(indent_str, " ")
-      lines  <- c(lines, paste0(prefix, wrapped[i]))
+    first_line  <- TRUE
+    for (block in note_blocks) {
+      for (wln in wrap_note(block, note_w)) {
+        prefix <- if (first_line) paste0(note_label, " ") else paste0(indent_str, " ")
+        lines  <- c(lines, paste0(prefix, wln))
+        first_line <- FALSE
+      }
     }
   }
 
@@ -271,17 +275,22 @@ pad_to <- function(x, n, fill) {
   c(x, rep(fill, n - length(x)))
 }
 
-build_ascii_note <- function(table_data, notes, notes.append) {
+# Build the note blocks for ASCII output as a character vector: one element
+# per line-group.  Block 1 combines the SE note and the significance legend;
+# each custom note in `notes` becomes its own block (its own line).
+build_ascii_notes <- function(table_data, notes, notes.append) {
   if (notes.append || is.null(notes)) {
-    se_raw  <- format_se_note(table_data$se_notes, table_data$col_numbers)
-    se_part <- if (!is.null(se_raw)) strip_latex(se_raw) else NULL
+    se_raw    <- format_se_note(table_data$se_notes, table_data$col_numbers)
+    se_part   <- if (!is.null(se_raw)) strip_latex(se_raw) else NULL
     star_part <- strip_latex(table_data$star_note)
-    parts <- c(se_part, star_part, notes)
-    parts <- Filter(function(x) !is.null(x) && nchar(x) > 0L, parts)
-    paste(parts, collapse = "; ")
+    sig_parts <- Filter(function(x) !is.null(x) && nchar(x) > 0L,
+                        c(se_part, star_part))
+    sig_block <- paste(sig_parts, collapse = "; ")
+    blocks    <- c(sig_block, notes)
   } else {
-    paste(notes, collapse = "; ")
+    blocks <- notes
   }
+  Filter(function(x) !is.null(x) && nchar(x) > 0L, blocks)
 }
 
 # Word-wrap note text to at most `width` characters per line, breaking only

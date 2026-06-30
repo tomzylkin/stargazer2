@@ -176,22 +176,30 @@ build_latex_header <- function(table_data, column.labels, dep.var.caption) {
 
 build_latex_notes <- function(table_data, notes, notes.append, notes.align,
                               notes.label, nc) {
-  # Build the note text
+  # Build the note blocks: block 1 combines the SE note and the significance
+  # legend; each custom note becomes its own row, matching the original
+  # stargazer's one-note-per-line layout.
   if (notes.append || is.null(notes)) {
-    se_part     <- format_se_note(table_data$se_notes, table_data$col_numbers)
-    star_part   <- table_data$star_note
-    parts <- c(se_part, star_part, notes)
-    parts <- Filter(function(x) !is.null(x) && nchar(x) > 0L, parts)
-    note_text <- paste(parts, collapse = "; ")
+    se_part   <- format_se_note(table_data$se_notes, table_data$col_numbers)
+    star_part <- table_data$star_note
+    sig_parts <- Filter(function(x) !is.null(x) && nchar(x) > 0L,
+                        c(se_part, star_part))
+    sig_block <- paste(sig_parts, collapse = "; ")
+    blocks    <- c(sig_block, notes)
   } else {
-    note_text <- paste(notes, collapse = "; ")
+    blocks <- notes
   }
+  blocks <- Filter(function(x) !is.null(x) && nchar(x) > 0L, blocks)
 
-  # Note content is NOT wrapped in \textit{} — matches original stargazer
-  paste0(
-    notes.label,
-    " & \\multicolumn{", nc, "}{", notes.align, "}{",
-    note_text,
-    "} \\\\ "
-  )
+  # First block carries the "Note:" label; later custom notes get an empty
+  # label cell.  Note content is NOT wrapped in \textit{} — matches original.
+  vapply(seq_along(blocks), function(i) {
+    label <- if (i == 1L) notes.label else " "
+    paste0(
+      label,
+      " & \\multicolumn{", nc, "}{", notes.align, "}{",
+      blocks[i],
+      "} \\\\ "
+    )
+  }, character(1L))
 }
