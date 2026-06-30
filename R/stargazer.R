@@ -275,6 +275,15 @@ stargazer <- function(...,
       notes           = notes,
       notes.append    = notes.append
     ),
+    html = render_html(
+      table_data,
+      title           = title,
+      dep.var.caption = dep.var.caption,
+      column.labels   = column.labels,
+      notes           = notes,
+      notes.append    = notes.append,
+      notes.label     = notes.label
+    ),
     stop("stargazer: type must be one of 'latex', 'text', 'html'.", call. = FALSE)
   )
 
