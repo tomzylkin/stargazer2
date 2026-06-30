@@ -122,39 +122,32 @@ fixest_iid_se_label <- function(method) {
   )
 }
 
-# Infer a human-readable SE-type label from a fixest_vcov matrix (output of
-# vcov() on a fixest model).  Uses the 'vcov_type' attribute set by fixest.
+# Return the SE-type string fixest records for an estimated model, e.g.
+# "IID", "Clustered (region)", "Heteroskedasticity-robust".  The location of
+# this attribute changed across fixest versions, so we read whichever source
+# the installed version populates:
+#   - fixest >= 0.14.0 attaches 'vcov_type' to the matrix returned by vcov()
+#     (its 'attr' argument defaults to TRUE).
+#   - fixest <= 0.13.x leaves vcov() bare but tags the summary object's
+#     coeftable / cov.scaled with a 'type' attribute.
+# Returns NULL if no source carries the type (callers fall back to the IID
+# label).  The string format is identical across these sources, so downstream
+# parsing in se_label_from_fixest_type() is version-independent.
+fixest_vcov_type <- function(model) {
+  vt <- attr(stats::vcov(model), "vcov_type")     # fixest >= 0.14.0
+  if (!is.null(vt)) return(vt)
+  s <- summary(model)
+  vt <- attr(s$coeftable, "type")                 # fixest <= 0.13.x
+  if (!is.null(vt)) return(vt)
+  attr(s$cov.scaled, "type")                      # extra safety net (may be NULL)
+}
+
+# Infer a human-readable SE-type label from a fixest SE-type string (as
+# returned by fixest_vcov_type()).
 # method: the fixest estimation method string (model$method), used to
-# distinguish OLS / Poisson / NegBin defaults when vcov_type == "IID".
-se_label_from_fixest_vcov <- function(V, method = "feols", vcov_call = NULL) {
-  vt <- attr(V, "vcov_type")
-  if (is.null(vt)) {
-    # Older fixest versions do not attach vcov_type to the matrix. Fall back to
-    # parsing model$call$vcov (passed in as vcov_call via as.character()).
-    # A formula vcov arg (e.g. ~X^Y) becomes c("~", "X^Y") after as.character().
-    if (is.character(vcov_call) && length(vcov_call) >= 2L &&
-        vcov_call[1L] == "~") {
-      rhs <- trimws(vcov_call[2L])
-      if (grepl("\\^", rhs)) {
-        # Interaction clustering: X^Y -> "X x Y"
-        parts <- trimws(strsplit(rhs, "\\^")[[1L]])
-        return(paste0("standard errors clustered by ", paste(parts, collapse = " x ")))
-      } else {
-        # Two-way (additive) clustering: X + Y -> "X and Y"
-        parts <- trimws(strsplit(rhs, "\\+")[[1L]])
-        return(paste0("standard errors clustered by ", paste(parts, collapse = " and ")))
-      }
-    }
-    if (is.character(vcov_call) && length(vcov_call) == 1L &&
-        grepl("^HC[0-9]+$", vcov_call, ignore.case = FALSE)) {
-      return(paste0(vcov_call, " heteroskedasticity-robust standard errors"))
-    }
-    if (is.character(vcov_call) && length(vcov_call) == 1L &&
-        tolower(vcov_call) %in% c("hetero", "robust")) {
-      return("heteroskedasticity-robust standard errors")
-    }
-    return(fixest_iid_se_label(method))
-  }
+# distinguish OLS / Poisson / NegBin defaults when the type is "IID".
+se_label_from_fixest_type <- function(vt, method = "feols", vcov_call = NULL) {
+  if (is.null(vt) || !nzchar(vt)) return(fixest_iid_se_label(method))
 
   if (vt == "IID") return(fixest_iid_se_label(method))
 

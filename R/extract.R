@@ -125,19 +125,18 @@ extract_model.fixest <- function(model, vcov_override = NULL, se_override = NULL
     se_vals  <- se_override
     se_label <- "user-specified standard errors"
   } else {
-    # Use the vcov baked into the model at estimation time;
-    # read the vcov_type attribute fixest sets on the returned matrix.
+    # Use the vcov baked into the model at estimation time.  The SE *values*
+    # come straight from vcov() (correct on every fixest version); the SE-type
+    # *label* is read via fixest_vcov_type(), which knows where each fixest
+    # version records it (matrix attribute on >= 0.14, summary attribute on
+    # older versions).  Relying on vcov()'s attribute alone mislabeled
+    # clustered SEs as "OLS" on fixest < 0.14.
     V        <- vcov(model)
     se_vals  <- sqrt(diag(V))
-    # Older fixest versions do not attach vcov_type to vcov(); fall back to
-    # coeftable(), which carries it more reliably across versions.
-    if (is.null(attr(V, "vcov_type"))) {
-      ct_vt <- tryCatch(attr(coeftable(model), "vcov_type"), error = function(e) NULL)
-      if (!is.null(ct_vt)) attr(V, "vcov_type") <- ct_vt
-    }
     method   <- if (!is.null(model$method)) model$method else "feols"
     vcov_call <- tryCatch(as.character(model$call$vcov), error = function(e) NULL)
-    se_label <- se_label_from_fixest_vcov(V, method = method, vcov_call = vcov_call)
+    se_label <- se_label_from_fixest_type(
+      fixest_vcov_type(model), method = method, vcov_call = vcov_call)
   }
 
   # t / z statistics and p-values
