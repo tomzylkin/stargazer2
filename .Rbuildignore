@@ -1,0 +1,5 @@
+^CLAUDE\.md$
+^\.git$
+^\.Rbuildignore$
+^.*\.Rproj$
+^\.Rproj\.user$

@@ -374,9 +374,11 @@ get_fixef_vars <- function(model) {
     return(as.character(fvars))
   }
 
-  # Fallback: parse the fixef formula
+  # Fallback: parse the fixef formula.  Use the stats::formula generic, which
+  # dispatches to fixest's formula.fixest method (fixest does not export a
+  # 'formula' object of its own).
   fml_fe <- tryCatch(
-    fixest::formula(model, type = "fixef"),
+    stats::formula(model, type = "fixef"),
     error = function(e) NULL
   )
   if (!is.null(fml_fe)) {

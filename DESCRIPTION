@@ -2,7 +2,7 @@ Package: stargazer2
 Type: Package
 Title: Beautiful Regression Tables for Modern Econometrics Packages
 Version: 0.0.1
-Date: 2026-03-26
+Date: 2026-06-30
 Authors@R: c(
     person("Tom", "Zylkin", role = c("aut", "cre"),
            email = "tzylkin@richmond.edu"))
@@ -14,7 +14,8 @@ Description: Produces publication-quality LaTeX, ASCII, and HTML regression
     objects.
 License: GPL-3
 Encoding: UTF-8
-RoxygenNote: 7.3.2
+Imports:
+    stats
 Suggests:
     fixest (>= 0.11.0),
     alpaca,
@@ -23,3 +24,4 @@ Suggests:
     stargazer,
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
+Config/roxygen2/version: 8.0.0
