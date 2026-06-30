@@ -56,12 +56,6 @@
 #'   size command is inserted.
 #' @param no.space Logical; suppress blank spacer rows in the table body.
 #'   Default: \code{FALSE}.
-#' @param show.dynamics Logical; when \code{TRUE} and a DiD model supports
-#'   event-study output, expand the single ATT row into per-period rows.
-#'   For \code{AGGTEobj} objects this requires \code{aggte(..., type = "dynamic")}.
-#'   For \code{emfx} objects pass \code{emfx(..., type = "event")} directly —
-#'   the extractor detects multi-row output automatically.  Default: \code{FALSE}.
-#'
 #' @param summary.stat Character vector; which summary statistics to include
 #'   when \code{stargazer} is called with a \code{data.frame}.  Recognised
 #'   values: \code{"n"}, \code{"mean"}, \code{"sd"}, \code{"min"},
@@ -123,7 +117,6 @@ stargazer <- function(...,
                       notes.label      = "\\textit{Note:} ",
                       font.size        = NULL,
                       no.space         = FALSE,
-                      show.dynamics    = FALSE,
                       summary.stat     = NULL,
                       median           = FALSE,
                       vcov             = NULL,
@@ -139,9 +132,7 @@ stargazer <- function(...,
   # --- Data frame / matrix input: route to summary statistics table ---
   # Must be checked before the pre-packed list unwrap below, because
   # data.frame objects are also lists and would otherwise be unpacked.
-  # Exclude DiD result objects that happen to inherit from data.frame.
   if (length(models) >= 1L &&
-      !inherits(models[[1L]], c("emfx", "staggered_result")) &&
       (is.data.frame(models[[1L]]) || is.matrix(models[[1L]]))) {
     return(stargazer_summary(
       data             = models[[1L]],
@@ -166,8 +157,7 @@ stargazer <- function(...,
   # Accept a pre-packed list as the first argument (common pattern).
   # Do NOT unwrap known model/result classes.
   if (length(models) == 1L && is.list(models[[1L]]) &&
-      !inherits(models[[1L]], c("lm", "fixest", "feglm", "summary.feglm",
-                                "AGGTEobj", "emfx", "staggered_result"))) {
+      !inherits(models[[1L]], c("lm", "fixest", "feglm", "summary.feglm"))) {
     models <- models[[1L]]
   }
 
@@ -194,8 +184,7 @@ stargazer <- function(...,
     records[[i]] <- extract_model(
       models[[i]],
       vcov_override = vcov_list[[i]],
-      se_override   = se_list[[i]],
-      show.dynamics = show.dynamics
+      se_override   = se_list[[i]]
     )
   }
 

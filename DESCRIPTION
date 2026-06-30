@@ -20,9 +20,6 @@ Suggests:
     alpaca,
     sandwich,
     wooldridge,
-    did,
-    etwfe,
-    staggered,
-    marginaleffects,
+    stargazer,
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
