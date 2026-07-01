@@ -1,0 +1,226 @@
+---
+title: "Getting Started with stargazer2"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting Started with stargazer2}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment  = "",
+  message  = FALSE,
+  warning  = FALSE
+)
+library(stargazer2)
+has_wooldridge <- requireNamespace("wooldridge",  quietly = TRUE)
+has_sandwich   <- requireNamespace("sandwich",    quietly = TRUE)
+```
+
+`stargazer2` is a drop-in replacement for the `stargazer` package with native support for modern econometrics packages.
+For `lm` objects the output is designed to be identical to the original, with one key addition: the standard error type is always identified in the table note.
+
+## Dataset
+
+We use the `wage1` dataset from the `wooldridge` package.
+Three categorical variables are constructed from existing binary indicators for use as controls and clustering variables.
+
+```{r wage1-setup, eval = requireNamespace("wooldridge", quietly=TRUE)}
+library(wooldridge)
+data(wage1)
+
+wage1$region <- factor(
+  ifelse(wage1$northcen == 1, "northcen",
+  ifelse(wage1$south    == 1, "south",
+  ifelse(wage1$west     == 1, "west", "northeast"))),
+  levels = c("northeast", "northcen", "south", "west")
+)
+
+wage1$occupation <- factor(
+  ifelse(wage1$profocc == 1, "professional",
+  ifelse(wage1$clerocc == 1, "clerical",
+  ifelse(wage1$servocc == 1, "service", "other"))),
+  levels = c("other", "professional", "clerical", "service")
+)
+
+wage1$industry <- factor(
+  ifelse(wage1$construc == 1, "construction",
+  ifelse(wage1$ndurman  == 1, "nondurable_manuf",
+  ifelse(wage1$trcommpu == 1, "transport",
+  ifelse(wage1$trade    == 1, "trade",
+  ifelse(wage1$services == 1, "services",
+  ifelse(wage1$profserv == 1, "prof_services", "other")))))),
+  levels = c("other", "construction", "nondurable_manuf",
+             "transport", "trade", "services", "prof_services")
+)
+```
+
+## A familiar table
+
+Four progressively richer log-wage specifications:
+
+```{r lm-models, eval = requireNamespace("wooldridge", quietly=TRUE)}
+m1 <- lm(lwage ~ educ + exper + tenure, wage1)
+m2 <- lm(lwage ~ educ + exper + tenure + female + married, wage1)
+m3 <- lm(lwage ~ educ + exper + tenure + female + married +
+            region + occupation, wage1)
+m4 <- lm(lwage ~ educ + exper + tenure + female + married +
+            region + occupation + industry, wage1)
+```
+
+A single call produces a publication-ready table.
+Models 3 and 4 include factor variables; `omit` suppresses their level dummies from the coefficient block so the table stays focused on the economic variables of interest.
+
+```{r basic-table, eval = requireNamespace("wooldridge", quietly=TRUE), results = "asis"}
+stargazer(m1, m2, m3, m4,
+          type             = "html",
+          title            = "Determinants of Log Wages",
+          dep.var.labels   = "log(Wage)",
+          covariate.labels = c("Education", "Experience", "Tenure",
+                               "Female", "Married"),
+          omit             = c("region", "occupation", "industry"),
+          column.labels    = c("Baseline", "Demographics",
+                               "Region/Occ.", "Full"),
+          notes.append     = FALSE,
+          notes            = "Controls for region, occupation, and industry included in models (3) and (4).")
+```
+
+## Output formats
+
+The `type` argument selects the output format.
+The default is `"latex"` for embedding in papers; `"text"` provides a quick terminal preview; `"html"` renders tables directly in R Markdown documents like this one.
+
+### Text (ASCII)
+
+```{r text-output, eval = requireNamespace("wooldridge", quietly=TRUE)}
+stargazer(m1, m2,
+          type             = "text",
+          dep.var.labels   = "log(Wage)",
+          covariate.labels = c("Education", "Experience", "Tenure"))
+```
+
+### LaTeX source
+
+```{r latex-output, eval = requireNamespace("wooldridge", quietly=TRUE)}
+stargazer(m1, m2,
+          type             = "latex",
+          title            = "Determinants of Log Wages",
+          label            = "tab:wage-ols",
+          dep.var.labels   = "log(Wage)",
+          covariate.labels = c("Education", "Experience", "Tenure"))
+```
+
+Paste this into your `.tex` file or write it directly with `out = "table.tex"`.
+
+## Custom standard errors via `vcov`
+
+The `vcov` argument accepts a list of variance-covariance matrices — one per model.
+`stargazer2` extracts the square root of the diagonal internally and updates the table note to name the SE type used in each column.
+This works with any function that returns a matrix: `sandwich::vcovHC`, `sandwich::vcovCL`, `lmtest`-style wrappers, or your own estimator.
+
+### HC1-robust SEs
+
+```{r robust-se, eval = requireNamespace("wooldridge", quietly=TRUE) && requireNamespace("sandwich", quietly=TRUE), results = "asis"}
+library(sandwich)
+stargazer(m1, m2, m3, m4,
+          type             = "html",
+          dep.var.labels   = "log(Wage)",
+          covariate.labels = c("Education", "Experience", "Tenure",
+                               "Female", "Married"),
+          omit             = c("region", "occupation", "industry"),
+          column.labels    = c("Baseline", "Demographics",
+                               "Region/Occ.", "Full"),
+          vcov             = list(vcovHC(m1, type = "HC1"),
+                                  vcovHC(m2, type = "HC1"),
+                                  vcovHC(m3, type = "HC1"),
+                                  vcovHC(m4, type = "HC1")))
+```
+
+### Industry-clustered SEs
+
+```{r clustered-se, eval = requireNamespace("wooldridge", quietly=TRUE) && requireNamespace("sandwich", quietly=TRUE), results = "asis"}
+stargazer(m1, m2, m3, m4,
+          type             = "html",
+          dep.var.labels   = "log(Wage)",
+          covariate.labels = c("Education", "Experience", "Tenure",
+                               "Female", "Married"),
+          omit             = c("region", "occupation", "industry"),
+          column.labels    = c("Baseline", "Demographics",
+                               "Region/Occ.", "Full"),
+          vcov             = list(vcovCL(m1, cluster = ~industry, data = wage1),
+                                  vcovCL(m2, cluster = ~industry, data = wage1),
+                                  vcovCL(m3, cluster = ~industry, data = wage1),
+                                  vcovCL(m4, cluster = ~industry, data = wage1)))
+```
+
+### Mixed SE types across columns
+
+`vcov` entries need not be the same type across columns.
+When SE types differ, the note reports them by column group — here column (1) uses HC1-robust SEs while columns (2)–(4) use industry-clustered SEs.
+
+```{r mixed-se, eval = requireNamespace("wooldridge", quietly=TRUE) && requireNamespace("sandwich", quietly=TRUE), results = "asis"}
+stargazer(m1, m2, m3, m4,
+          type             = "html",
+          dep.var.labels   = "log(Wage)",
+          covariate.labels = c("Education", "Experience", "Tenure",
+                               "Female", "Married"),
+          omit             = c("region", "occupation", "industry"),
+          column.labels    = c("Baseline", "Demographics",
+                               "Region/Occ.", "Full"),
+          vcov             = list(vcovHC(m1, type = "HC1"),
+                                  vcovCL(m2, cluster = ~industry, data = wage1),
+                                  vcovCL(m3, cluster = ~industry, data = wage1),
+                                  vcovCL(m4, cluster = ~industry, data = wage1)))
+```
+
+## Cosmetic options
+
+The most commonly used formatting arguments are illustrated here together.
+
+| Argument | Purpose |
+|---|---|
+| `dep.var.labels` | Override dependent variable name(s) |
+| `covariate.labels` | Rename coefficient rows (in display order) |
+| `column.labels` | Column headers beneath the dep-var line |
+| `omit` / `keep` | Regex patterns to drop or retain coefficient rows |
+| `digits` | Decimal places for all numbers |
+| `star.cutoffs` | P-value thresholds for significance stars |
+| `notes` / `notes.append` | Add or replace the automatic table note |
+| `title` / `label` | Caption and `\label{}` for LaTeX |
+
+## Table styles
+
+The `style` argument selects a layout preset.
+
+| Style | Layout | Significance note |
+|---|---|---|
+| `"stargazer2"` | Single `\hline`, full-width left-aligned note | p-value thresholds (default) |
+| `"stargazer"` | Matches original package exactly (double rules, `\\[-1.8ex]`) | p-value thresholds |
+| `"aer"` | American Economic Review — clean, no dep-var caption | Text descriptions ("Significant at the X percent level") |
+| `"qje"` | Quarterly Journal of Economics — like AER; observations labelled $N$ | Text descriptions |
+
+The difference is most visible in the LaTeX source.
+Here is a two-column table with the `"aer"` style:
+
+```{r style-aer, eval = requireNamespace("wooldridge", quietly=TRUE)}
+stargazer(m1, m2,
+          type             = "latex",
+          dep.var.labels   = "log(Wage)",
+          covariate.labels = c("Education", "Experience", "Tenure"),
+          style            = "aer")
+```
+
+## Summary statistics
+
+Passing a data frame instead of model objects produces a summary statistics table.
+
+```{r summary-stats, eval = requireNamespace("wooldridge", quietly=TRUE)}
+stargazer(
+  wage1[, c("lwage", "educ", "exper", "tenure", "female", "married")],
+  type             = "text",
+  covariate.labels = c("log(Wage)", "Education", "Experience",
+                       "Tenure", "Female", "Married")
+)
+```

@@ -14,7 +14,8 @@ format_table(
   digits = 3L,
   star.cutoffs = c(0.1, 0.05, 0.01),
   star.char = c("*", "**", "***"),
-  no.space = FALSE
+  no.space = FALSE,
+  obs.label = "Observations"
 )
 }
 \arguments{
@@ -42,6 +43,9 @@ are kept (applied after \code{omit}).}
 \item{star.char}{Character vector of star strings.}
 
 \item{no.space}{Logical; suppress blank spacer rows.}
+
+\item{obs.label}{Character; label for the Observations row.  Default
+\code{"Observations"}; set to \code{"\\\\textit\{N\}"} for QJE style.}
 }
 \description{
 Internal; called by \code{\link{stargazer}}.

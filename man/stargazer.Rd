@@ -23,10 +23,12 @@ stargazer(
   star.char = c("*", "**", "***"),
   notes = NULL,
   notes.append = TRUE,
-  notes.align = "r",
-  notes.label = "\\\\textit{Note:} ",
+  notes.align = NULL,
+  notes.label = NULL,
   font.size = NULL,
   no.space = FALSE,
+  style = "stargazer2",
+  obs.label = NULL,
   summary.stat = NULL,
   median = FALSE,
   vcov = NULL,
@@ -106,7 +108,29 @@ significance notes are replaced by \code{notes}.  Default: \code{TRUE}.}
 size command is inserted.}
 
 \item{no.space}{Logical; suppress blank spacer rows in the table body.
-Default: \code{FALSE}.}
+Only affects \code{style = "stargazer"}.  Default: \code{FALSE}.}
+
+\item{style}{Character; table formatting style.  Controls overall layout,
+rule style, notes format, and significance-note wording.
+\describe{
+  \item{\code{"stargazer2"}}{(Default) Clean layout: single \code{\\hline}
+    throughout, no \code{\\cline}, full-width left-aligned notes cell
+    ending in a period, p-value significance legend.}
+  \item{\code{"stargazer"}}{Replicates the original \pkg{stargazer}
+    output byte-for-byte: double top rule with \code{\\\\{[}-1.8ex{]}},
+    \code{\\cline}, blank spacer rows (controlled by \code{no.space}),
+    right-aligned notes.}
+  \item{\code{"aer"}}{American Economic Review style: clean layout, no
+    \dQuote{Dependent variable:} caption, single bottom rule, left-aligned
+    notes with text significance descriptions.}
+  \item{\code{"qje"}}{Quarterly Journal of Economics style: like
+    \code{"aer"} but double bottom rule, right-aligned notes, and
+    \code{\\textit\{N\}} for the observations label.}
+}}
+
+\item{obs.label}{Character; overrides the label for the Observations row.
+Defaults to the style preset (\code{"Observations"} for most styles,
+\code{"\\textit\{N\}"} for \code{"qje"}).}
 
 \item{summary.stat}{Character vector; which summary statistics to include
 when \code{stargazer} is called with a \code{data.frame}.  Recognised

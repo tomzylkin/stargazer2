@@ -13,8 +13,9 @@ render_latex(
   font.size = NULL,
   notes = NULL,
   notes.append = TRUE,
-  notes.align = "r",
-  notes.label = "\\\\textit{Note:} "
+  notes.align = "l",
+  notes.label = "\\\\textit{Note:} ",
+  style = "stargazer2"
 )
 }
 \arguments{
@@ -24,10 +25,10 @@ render_latex(
 
 \item{label}{LaTeX label string (\code{\\label\{...\}}).}
 
-\item{dep.var.caption}{Caption above the dependent-variable line.}
+\item{dep.var.caption}{Caption above the dependent-variable line (empty
+string suppresses the row entirely).}
 
-\item{column.labels}{Optional character vector of column labels
-(overrides model_labels in the header).}
+\item{column.labels}{Optional character vector of column labels.}
 
 \item{font.size}{LaTeX font-size command (e.g. \code{"small"}).}
 
@@ -35,10 +36,12 @@ render_latex(
 
 \item{notes.append}{Logical; if \code{FALSE}, replace the default note.}
 
-\item{notes.align}{Alignment of the notes cell: \code{"l"}, \code{"c"},
-or \code{"r"}.}
+\item{notes.align}{Alignment of the notes cell.}
 
 \item{notes.label}{Label preceding the note text.}
+
+\item{style}{One of \code{"stargazer2"}, \code{"stargazer"},
+\code{"aer"}, \code{"qje"}.}
 }
 \description{
 Internal; called by \code{\link{stargazer}}.

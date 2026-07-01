@@ -1,0 +1,176 @@
+---
+title: "Modern Estimators: fixest and alpaca"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Modern Estimators: fixest and alpaca}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment  = "",
+  message  = FALSE,
+  warning  = FALSE
+)
+library(stargazer2)
+has_wooldridge <- requireNamespace("wooldridge", quietly = TRUE)
+has_fixest     <- requireNamespace("fixest",     quietly = TRUE)
+has_alpaca     <- requireNamespace("alpaca",     quietly = TRUE)
+```
+
+`stargazer2` supports `fixest` and `alpaca` model objects natively, with two features that matter for modern applied work:
+
+1. **Fixed effects are reported as indicator rows** ("Yes / No") at the bottom of the table rather than as coefficient rows. This follows the convention in the trade and IO literatures where high-dimensional FEs are controls, not objects of interest.
+
+2. **Standard error types are auto-detected** from the model object and reported in the table note. When different columns use different SE types, the note breaks them out by column group automatically.
+
+## Standard error interface
+
+`stargazer2` accepts SEs through three mechanisms, applied in order of precedence:
+
+| Priority | Mechanism | When to use |
+|---|---|---|
+| 1 (highest) | `vcov = list(V1, V2, ...)` | Any vcov matrix — most flexible |
+| 2 | `se = list(se1, se2, ...)` | Numeric SE vectors (drop-in for original stargazer scripts) |
+| 3 (lowest) | Auto-extraction | fixest and alpaca models — SE type read from the model object |
+
+Passing `NULL` for a specific entry in the `vcov` list tells `stargazer2` to fall back to auto-extraction for that column, which is useful when mixing `lm` models with externally supplied vcov matrices and `fixest` models that already carry their SE type.
+
+## Fixed effects with fixest
+
+```{r wage1-setup, eval = requireNamespace("wooldridge", quietly=TRUE)}
+library(wooldridge)
+data(wage1)
+
+wage1$region <- factor(
+  ifelse(wage1$northcen == 1, "northcen",
+  ifelse(wage1$south    == 1, "south",
+  ifelse(wage1$west     == 1, "west", "northeast"))),
+  levels = c("northeast", "northcen", "south", "west")
+)
+
+wage1$occupation <- factor(
+  ifelse(wage1$profocc == 1, "professional",
+  ifelse(wage1$clerocc == 1, "clerical",
+  ifelse(wage1$servocc == 1, "service", "other"))),
+  levels = c("other", "professional", "clerical", "service")
+)
+
+wage1$industry <- factor(
+  ifelse(wage1$construc == 1, "construction",
+  ifelse(wage1$ndurman  == 1, "nondurable_manuf",
+  ifelse(wage1$trcommpu == 1, "transport",
+  ifelse(wage1$trade    == 1, "trade",
+  ifelse(wage1$services == 1, "services",
+  ifelse(wage1$profserv == 1, "prof_services", "other")))))),
+  levels = c("other", "construction", "nondurable_manuf",
+             "transport", "trade", "services", "prof_services")
+)
+```
+
+We estimate five log-wage regressions with `feols`, varying the set of fixed effects and using two-way clustering on region × industry throughout.
+The interacted FE specification `region^industry` absorbs a full set of region-by-industry cells.
+
+```{r fixest-models, eval = requireNamespace("wooldridge", quietly=TRUE) && requireNamespace("fixest", quietly=TRUE)}
+library(fixest)
+
+f1 <- feols(lwage ~ educ + exper + tenure + female + married |
+              region,               wage1, vcov = ~region^industry)
+f2 <- feols(lwage ~ educ + exper + tenure + female + married |
+              occupation,           wage1, vcov = ~region^industry)
+f3 <- feols(lwage ~ educ + exper + tenure + female + married |
+              region + occupation,  wage1, vcov = ~region^industry)
+f4 <- feols(lwage ~ educ + exper + tenure + female + married |
+              region + occupation + industry,
+                                    wage1, vcov = ~region^industry)
+f5 <- feols(lwage ~ educ + exper + tenure + female + married |
+              region^industry,      wage1, vcov = ~region^industry)
+```
+
+```{r fixest-table, eval = requireNamespace("wooldridge", quietly=TRUE) && requireNamespace("fixest", quietly=TRUE), results = "asis"}
+stargazer(f1, f2, f3, f4, f5,
+          type             = "html",
+          title            = "Log Wages: Varying Fixed Effects",
+          dep.var.labels   = "log(Wage)",
+          covariate.labels = c("Education", "Experience", "Tenure",
+                               "Female", "Married"))
+```
+
+Two things to notice:
+
+- **FE indicator rows** appear below the coefficient block — one row per unique fixed effect across all columns, with "Yes" or "No" per model. The interacted specification `region^industry` is rendered as a single "Region x Industry FE" row.
+- **SE type** is auto-detected from the fixest model and reported uniformly in the note, since all five models use the same clustering strategy.
+
+## Multiple estimators and clustering: the gravity model
+
+The `fixest` package's built-in `trade` dataset provides a natural setting for showcasing different estimators.
+We estimate a standard gravity equation for trade flows using OLS, Poisson pseudo-maximum likelihood (PPML), and negative binomial — all with the same four-way fixed effects.
+
+```{r gravity-models, eval = requireNamespace("fixest", quietly=TRUE)}
+data(trade, package = "fixest")
+
+gravity_ols    <- feols(log(Euros) ~ log(dist_km) |
+                          Origin + Destination + Product + Year, trade)
+gravity_pois   <- fepois(Euros ~ log(dist_km) |
+                           Origin + Destination + Product + Year, trade)
+gravity_negbin <- fenegbin(Euros ~ log(dist_km) |
+                             Origin + Destination + Product + Year, trade)
+```
+
+For the Poisson specifications we add two further columns with explicit clustering strategies to illustrate the clustering-label machinery:
+`~Origin^Destination` clusters by the interaction (one cluster per origin-destination pair); `~Origin+Destination` is two-way clustering by origin and by destination separately.
+
+```{r gravity-clustered, eval = requireNamespace("fixest", quietly=TRUE)}
+gravity_pois1  <- fepois(Euros ~ log(dist_km) |
+                           Origin + Destination + Product + Year,
+                         trade, vcov = ~Origin^Destination)
+gravity_pois2  <- fepois(Euros ~ log(dist_km) |
+                           Origin + Destination + Product + Year,
+                         trade, vcov = ~Origin + Destination)
+```
+
+```{r gravity-table, eval = requireNamespace("fixest", quietly=TRUE), results = "asis"}
+stargazer(gravity_ols, gravity_pois, gravity_negbin,
+          gravity_pois1, gravity_pois2,
+          type          = "html",
+          title         = "Gravity Equation for Trade Flows",
+          dep.var.labels = c("log(Euros)", "Euros"),
+          column.labels = c("OLS", "Poisson", "Neg. Bin.",
+                            "Poisson", "Poisson"))
+```
+
+The SE note shows per-column types: OLS standard errors for column (1), MLE standard errors for (2)–(3) (auto-detected from the fixest objects), standard errors clustered by Origin-Destination for column (4), and two-way clustered by Origin and Destination for column (5).
+
+## Non-linear models with alpaca
+
+The `alpaca` package offers an alternative implementation of fixed-effects GLMs (logit, probit, Poisson) with a focus on computational efficiency for high-dimensional FEs.
+`stargazer2` supports `alpaca::feglm` objects through a companion pair of vcov helpers:
+
+- `alpaca_vcovSandwich()` — heteroskedasticity-robust (sandwich) SEs
+- `alpaca_vcovCL()` — clustered SEs, with a formula interface matching `sandwich::vcovCL`
+
+```{r alpaca-table, eval = requireNamespace("wooldridge", quietly=TRUE) && requireNamespace("alpaca", quietly=TRUE), results = "asis"}
+library(alpaca)
+
+# Logit model: P(married) as a function of wages and human capital,
+# with occupation and industry fixed effects.
+# industry must be in the FE specification for clustering by industry.
+m_alp <- feglm(married ~ lwage + educ + exper | occupation + industry,
+               wage1, binomial("logit"))
+
+# Two SE variants for the same model
+V_robust    <- alpaca_vcovSandwich(m_alp)
+V_clustered <- alpaca_vcovCL(m_alp, cluster = ~industry)
+
+stargazer(m_alp, m_alp,
+          type             = "html",
+          title            = "P(Married): Logit with Occupation FE",
+          dep.var.labels   = "Married (0/1)",
+          covariate.labels = c("log(Wage)", "Education", "Experience"),
+          column.labels    = c("Sandwich-robust", "Industry-clustered"),
+          vcov             = list(V_robust, V_clustered))
+```
+
+The SE note names the type for each column exactly as it does for fixest and sandwich models, confirming that the reporting machinery is consistent across all supported packages.
