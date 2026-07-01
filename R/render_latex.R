@@ -20,6 +20,11 @@
 #' @param notes.align  Alignment of the notes cell: \code{"l"}, \code{"c"},
 #'   or \code{"r"}.
 #' @param notes.label  Label preceding the note text.
+#' @param lyx.friendly Logical; if \code{TRUE}, use
+#'   \code{\\noalign\{\\vspace\{-1.8ex\}\}} for inter-row spacing instead of
+#'   the \code{\\\\{[}-1.8ex{]}} optional-argument form.  Both produce
+#'   identical compiled output; the \code{\\noalign} form is parsed correctly
+#'   by LyX.  Default: \code{FALSE} (original stargazer behaviour).
 #' @keywords internal
 render_latex <- function(table_data,
                          title        = "",
@@ -30,10 +35,21 @@ render_latex <- function(table_data,
                          notes           = NULL,
                          notes.append    = TRUE,
                          notes.align     = "r",
-                         notes.label     = "\\textit{Note:} ") {
+                         notes.label     = "\\textit{Note:} ",
+                         lyx.friendly    = FALSE) {
 
   nc    <- table_data$n_cols   # number of data columns
   ncols <- nc + 1L             # including the label column
+
+  # Spacing helpers: lyx.friendly=TRUE uses \noalign{\vspace{}} which LyX
+  # parses correctly; both variants produce identical compiled output.
+  if (lyx.friendly) {
+    sp_open  <- "\\\\ \\noalign{\\vspace{-1.8ex}} \\hline "  # \\[-1.8ex]\hline
+    sp_close <- "\\hline \\noalign{\\vspace{-1.8ex}} "        # \hline \\[-1.8ex]
+  } else {
+    sp_open  <- "\\\\[-1.8ex]\\hline "
+    sp_close <- "\\hline \\\\[-1.8ex] "
+  }
 
   # Helper: build one LaTeX row from a label and a values vector
   make_row <- function(label, values, indent = FALSE) {
@@ -63,14 +79,15 @@ render_latex <- function(table_data,
   lines <- c(lines, paste0("\\begin{tabular}{", col_spec, "} "))
 
   # Top double rule
-  lines <- c(lines, "\\\\[-1.8ex]\\hline ")
-  lines <- c(lines, "\\hline \\\\[-1.8ex] ")
+  lines <- c(lines, sp_open)
+  lines <- c(lines, sp_close)
 
   # --- Header ---
-  lines <- c(lines, build_latex_header(table_data, column.labels, dep.var.caption))
+  lines <- c(lines, build_latex_header(table_data, column.labels, dep.var.caption,
+                                       lyx.friendly))
 
   # --- Coefficient rows ---
-  lines <- c(lines, "\\hline \\\\[-1.8ex] ")
+  lines <- c(lines, sp_close)
   n_coef <- length(table_data$coef_rows)
   for (i in seq_len(n_coef)) {
     row <- table_data$coef_rows[[i]]
@@ -84,7 +101,7 @@ render_latex <- function(table_data,
 
   # --- Fixed-effects indicator rows (if any) ---
   if (length(table_data$fe_rows) > 0L) {
-    lines <- c(lines, "\\hline \\\\[-1.8ex] ")
+    lines <- c(lines, sp_close)
     for (row in table_data$fe_rows) {
       lines <- c(lines, make_row(row$label, row$values))
     }
@@ -92,14 +109,14 @@ render_latex <- function(table_data,
   }
 
   # --- Fit-statistic rows ---
-  lines <- c(lines, "\\hline \\\\[-1.8ex] ")
+  lines <- c(lines, sp_close)
   for (row in table_data$stat_rows) {
     lines <- c(lines, make_row(row$label, row$values))
   }
 
   # Bottom double rule
   lines <- c(lines, "\\hline ")
-  lines <- c(lines, "\\hline \\\\[-1.8ex] ")
+  lines <- c(lines, sp_close)
 
   # --- Notes ---
   note_lines <- build_latex_notes(
@@ -118,11 +135,14 @@ render_latex <- function(table_data,
 # Header builder
 # ---------------------------------------------------------------------------
 
-build_latex_header <- function(table_data, column.labels, dep.var.caption) {
+build_latex_header <- function(table_data, column.labels, dep.var.caption,
+                               lyx.friendly = FALSE) {
   nc          <- table_data$n_cols
   dep_vars    <- latex_escape(table_data$dep_vars)
   col_numbers <- table_data$col_numbers
   lines       <- character(0L)
+
+  row_sp <- if (lyx.friendly) "\\\\ \\noalign{\\vspace{-1.8ex}} " else "\\\\[-1.8ex] "
 
   # "Dependent variable:" caption spanning all data columns
   lines <- c(lines, paste0(
@@ -134,11 +154,11 @@ build_latex_header <- function(table_data, column.labels, dep.var.caption) {
   # Original stargazer: use \multicolumn only when nc > 1 (single column needs no span)
   if (length(unique(dep_vars)) == 1L && nc > 1L) {
     lines <- c(lines, paste0(
-      "\\\\[-1.8ex] & \\multicolumn{", nc, "}{c}{", dep_vars[1L], "} \\\\ "
+      row_sp, "& \\multicolumn{", nc, "}{c}{", dep_vars[1L], "} \\\\ "
     ))
   } else {
     lines <- c(lines, paste0(
-      "\\\\[-1.8ex] & ", paste(dep_vars, collapse = " & "), " \\\\ "
+      row_sp, "& ", paste(dep_vars, collapse = " & "), " \\\\ "
     ))
   }
 
@@ -156,14 +176,14 @@ build_latex_header <- function(table_data, column.labels, dep.var.caption) {
       col_labels <- c(col_labels, rep("", nc - length(col_labels)))
     }
     lines <- c(lines, paste0(
-      "\\\\[-1.8ex] & ", paste(col_labels[seq_len(nc)], collapse = " & "), " \\\\ "
+      row_sp, "& ", paste(col_labels[seq_len(nc)], collapse = " & "), " \\\\ "
     ))
   }
 
   # Column numbers: original stargazer suppresses for single-model tables
   if (nc > 1L) {
     lines <- c(lines, paste0(
-      "\\\\[-1.8ex] & ", paste(col_numbers, collapse = " & "), "\\\\ "
+      row_sp, "& ", paste(col_numbers, collapse = " & "), "\\\\ "
     ))
   }
 

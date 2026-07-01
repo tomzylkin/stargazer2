@@ -56,6 +56,11 @@
 #'   size command is inserted.
 #' @param no.space Logical; suppress blank spacer rows in the table body.
 #'   Default: \code{FALSE}.
+#' @param lyx.friendly Logical; if \code{TRUE} and \code{type = "latex"},
+#'   use \code{\\noalign\{\\vspace\{-1.8ex\}\}} for inter-row spacing instead
+#'   of the \code{\\\\{[}-1.8ex{]}} optional-argument form.  Both produce
+#'   identical compiled output; the \code{\\noalign} form is parsed correctly
+#'   by LyX.  Default: \code{FALSE}.
 #' @param summary.stat Character vector; which summary statistics to include
 #'   when \code{stargazer} is called with a \code{data.frame}.  Recognised
 #'   values: \code{"n"}, \code{"mean"}, \code{"sd"}, \code{"min"},
@@ -117,6 +122,7 @@ stargazer <- function(...,
                       notes.label      = "\\textit{Note:} ",
                       font.size        = NULL,
                       no.space         = FALSE,
+                      lyx.friendly     = FALSE,
                       summary.stat     = NULL,
                       median           = FALSE,
                       vcov             = NULL,
@@ -265,7 +271,8 @@ stargazer <- function(...,
       notes           = notes,
       notes.append    = notes.append,
       notes.align     = notes.align,
-      notes.label     = notes.label
+      notes.label     = notes.label,
+      lyx.friendly    = lyx.friendly
     ),
     text = render_ascii(
       table_data,
