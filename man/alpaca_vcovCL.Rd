@@ -22,3 +22,17 @@ Wraps \code{summary(mod, type = "clustered", cluster = cluster)} and
 returns a diagonal variance-covariance matrix that \code{\link{stargazer}}
 recognises and labels with the appropriate "clustered by ..." description.
 }
+\examples{
+\donttest{
+if (requireNamespace("alpaca", quietly = TRUE)) {
+  d <- data.frame(
+    y   = rbinom(200, 1, 0.5),
+    x1  = rnorm(200),
+    grp = factor(rep(1:10, 20))
+  )
+  mod <- alpaca::feglm(y ~ x1 | grp, d, binomial("logit"))
+  V   <- alpaca_vcovCL(mod, cluster = ~grp)
+  stargazer(mod, vcov = list(V), type = "text")
+}
+}
+}

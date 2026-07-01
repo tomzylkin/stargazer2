@@ -172,11 +172,9 @@ modern econometrics packages including \pkg{fixest} and \pkg{alpaca}.
 Outputs LaTeX, plain-text (ASCII), and HTML tables.
 }
 \examples{
-\dontrun{
 m1 <- lm(mpg ~ cyl + hp, mtcars)
 m2 <- lm(mpg ~ cyl + hp + wt, mtcars)
-stargazer(m1, m2)
 stargazer(m1, m2, type = "text")
-}
+stargazer(m1, m2, type = "latex")
 
 }

@@ -107,12 +107,10 @@
 #'   invisibly.  Also printed to the console unless \code{out} is specified.
 #'
 #' @examples
-#' \dontrun{
 #' m1 <- lm(mpg ~ cyl + hp, mtcars)
 #' m2 <- lm(mpg ~ cyl + hp + wt, mtcars)
-#' stargazer(m1, m2)
 #' stargazer(m1, m2, type = "text")
-#' }
+#' stargazer(m1, m2, type = "latex")
 #'
 #' @export
 stargazer <- function(...,

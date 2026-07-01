@@ -1,4 +1,6 @@
 ^CLAUDE\.md$
+^README\.md$
+^cran-comments\.md$
 ^\.git$
 ^\.Rbuildignore$
 ^.*\.Rproj$

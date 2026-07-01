@@ -20,6 +20,19 @@
 #' @param mod A fitted \code{feglm} object from the \pkg{alpaca} package.
 #' @return A square diagonal matrix of class \code{"vcovAlpacaSandwich"} with
 #'   squared sandwich standard errors on the diagonal.
+#' @examples
+#' \donttest{
+#' if (requireNamespace("alpaca", quietly = TRUE)) {
+#'   d <- data.frame(
+#'     y   = rbinom(200, 1, 0.5),
+#'     x1  = rnorm(200),
+#'     grp = factor(rep(1:10, 20))
+#'   )
+#'   mod <- alpaca::feglm(y ~ x1 | grp, d, binomial("logit"))
+#'   V   <- alpaca_vcovSandwich(mod)
+#'   stargazer(mod, vcov = list(V), type = "text")
+#' }
+#' }
 #' @export
 alpaca_vcovSandwich <- function(mod) {
   if (!requireNamespace("alpaca", quietly = TRUE)) {
@@ -45,6 +58,19 @@ alpaca_vcovSandwich <- function(mod) {
 #'   \code{~X^Y} for two-way interaction clustering.
 #' @return A square diagonal matrix of class \code{"vcovAlpacaCL"} with a
 #'   \code{"cluster"} attribute containing the cluster formula.
+#' @examples
+#' \donttest{
+#' if (requireNamespace("alpaca", quietly = TRUE)) {
+#'   d <- data.frame(
+#'     y   = rbinom(200, 1, 0.5),
+#'     x1  = rnorm(200),
+#'     grp = factor(rep(1:10, 20))
+#'   )
+#'   mod <- alpaca::feglm(y ~ x1 | grp, d, binomial("logit"))
+#'   V   <- alpaca_vcovCL(mod, cluster = ~grp)
+#'   stargazer(mod, vcov = list(V), type = "text")
+#' }
+#' }
 #' @export
 alpaca_vcovCL <- function(mod, cluster) {
   if (!requireNamespace("alpaca", quietly = TRUE)) {
