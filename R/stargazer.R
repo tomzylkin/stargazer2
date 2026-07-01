@@ -5,7 +5,8 @@
 #' Outputs LaTeX, plain-text (ASCII), and HTML tables.
 #'
 #' @param ...  One or more fitted model objects.  Supported classes:
-#'   \code{lm}, \code{fixest}.
+#'   \code{lm}, \code{fixest} (\code{feols}, \code{fepois}, \code{fenegbin},
+#'   \code{feglm}), \code{alpaca::feglm}, and \code{summary.feglm}.
 #'
 #' @param type Character; output format.  One of \code{"latex"} (default),
 #'   \code{"text"}, or \code{"html"}.
@@ -48,7 +49,9 @@
 #' @param notes.append Logical; if \code{FALSE}, the default SE-type and
 #'   significance notes are replaced by \code{notes}.  Default: \code{TRUE}.
 #' @param notes.align Character; cell alignment for the note row in LaTeX
-#'   (\code{"l"}, \code{"c"}, or \code{"r"}).  Default: \code{"r"}.
+#'   (\code{"l"}, \code{"c"}, or \code{"r"}).  \code{NULL} (default) defers
+#'   to the \code{style} preset: \code{"l"} for \code{"stargazer2"} and
+#'   \code{"aer"}, \code{"r"} for \code{"stargazer"} and \code{"qje"}.
 #' @param notes.label Character; text preceding the note.  Default:
 #'   \code{"\\textit\{Note:\} "}.
 #' @param font.size Character; LaTeX font-size command (e.g.

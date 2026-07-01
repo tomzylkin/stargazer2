@@ -39,7 +39,8 @@ stargazer(
 }
 \arguments{
 \item{...}{One or more fitted model objects.  Supported classes:
-\code{lm}, \code{fixest}.}
+\code{lm}, \code{fixest} (\code{feols}, \code{fepois}, \code{fenegbin},
+\code{feglm}), \code{alpaca::feglm}, and \code{summary.feglm}.}
 
 \item{type}{Character; output format.  One of \code{"latex"} (default),
 \code{"text"}, or \code{"html"}.}
@@ -98,7 +99,9 @@ SE-type note.}
 significance notes are replaced by \code{notes}.  Default: \code{TRUE}.}
 
 \item{notes.align}{Character; cell alignment for the note row in LaTeX
-(\code{"l"}, \code{"c"}, or \code{"r"}).  Default: \code{"r"}.}
+(\code{"l"}, \code{"c"}, or \code{"r"}).  \code{NULL} (default) defers
+to the \code{style} preset: \code{"l"} for \code{"stargazer2"} and
+\code{"aer"}, \code{"r"} for \code{"stargazer"} and \code{"qje"}.}
 
 \item{notes.label}{Character; text preceding the note.  Default:
 \code{"\\textit\{Note:\} "}.}
