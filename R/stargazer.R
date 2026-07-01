@@ -55,12 +55,27 @@
 #'   \code{"small"}, \code{"footnotesize"}).  \code{NULL} (default) means no
 #'   size command is inserted.
 #' @param no.space Logical; suppress blank spacer rows in the table body.
-#'   Default: \code{FALSE}.
-#' @param lyx.friendly Logical; if \code{TRUE} and \code{type = "latex"},
-#'   use \code{\\noalign\{\\vspace\{-1.8ex\}\}} for inter-row spacing instead
-#'   of the \code{\\\\{[}-1.8ex{]}} optional-argument form.  Both produce
-#'   identical compiled output; the \code{\\noalign} form is parsed correctly
-#'   by LyX.  Default: \code{FALSE}.
+#'   Only affects \code{style = "stargazer"}.  Default: \code{FALSE}.
+#' @param style Character; table formatting style.  Controls overall layout,
+#'   rule style, notes format, and significance-note wording.
+#'   \describe{
+#'     \item{\code{"stargazer2"}}{(Default) Clean layout: single \code{\\hline}
+#'       throughout, no \code{\\cline}, full-width left-aligned notes cell
+#'       ending in a period, p-value significance legend.}
+#'     \item{\code{"stargazer"}}{Replicates the original \pkg{stargazer}
+#'       output byte-for-byte: double top rule with \code{\\\\{[}-1.8ex{]}},
+#'       \code{\\cline}, blank spacer rows (controlled by \code{no.space}),
+#'       right-aligned notes.}
+#'     \item{\code{"aer"}}{American Economic Review style: clean layout, no
+#'       \dQuote{Dependent variable:} caption, single bottom rule, left-aligned
+#'       notes with text significance descriptions.}
+#'     \item{\code{"qje"}}{Quarterly Journal of Economics style: like
+#'       \code{"aer"} but double bottom rule, right-aligned notes, and
+#'       \code{\\textit\{N\}} for the observations label.}
+#'   }
+#' @param obs.label Character; overrides the label for the Observations row.
+#'   Defaults to the style preset (\code{"Observations"} for most styles,
+#'   \code{"\\textit\{N\}"} for \code{"qje"}).
 #' @param summary.stat Character vector; which summary statistics to include
 #'   when \code{stargazer} is called with a \code{data.frame}.  Recognised
 #'   values: \code{"n"}, \code{"mean"}, \code{"sd"}, \code{"min"},
@@ -118,11 +133,12 @@ stargazer <- function(...,
                       star.char        = c("*", "**", "***"),
                       notes            = NULL,
                       notes.append     = TRUE,
-                      notes.align      = "r",
-                      notes.label      = "\\textit{Note:} ",
+                      notes.align      = NULL,
+                      notes.label      = NULL,
                       font.size        = NULL,
                       no.space         = FALSE,
-                      lyx.friendly     = FALSE,
+                      style            = "stargazer2",
+                      obs.label        = NULL,
                       summary.stat     = NULL,
                       median           = FALSE,
                       vcov             = NULL,
@@ -210,6 +226,12 @@ stargazer <- function(...,
     }
   }
 
+  # --- Resolve style defaults for user-nullable parameters ---
+  sd <- get_style_defaults(style)
+  if (is.null(notes.align)) notes.align <- sd$notes.align
+  if (is.null(notes.label)) notes.label <- sd$notes.label
+  if (is.null(obs.label))   obs.label   <- sd$obs.label
+
   # --- Apply se_label override ---
   if (!is.null(se_label)) {
     if (length(se_label) == 1L) se_label <- rep(se_label, n_models)
@@ -246,10 +268,15 @@ stargazer <- function(...,
     digits           = digits,
     star.cutoffs     = star.cutoffs,
     star.char        = star.char,
-    no.space         = no.space
+    no.space         = no.space,
+    obs.label        = obs.label
   )
 
-  # --- Default dep.var.caption per output type ---
+  # --- Default dep.var.caption: style can suppress it (empty string), or
+  #     the user can override; NULL falls through to the type-based default ---
+  if (is.null(dep.var.caption)) {
+    dep.var.caption <- sd$dep.var.caption   # may be "" (suppressed) or NULL
+  }
   if (is.null(dep.var.caption)) {
     dep.var.caption <- switch(type,
       latex = "\\textit{Dependent variable:}",
@@ -272,7 +299,7 @@ stargazer <- function(...,
       notes.append    = notes.append,
       notes.align     = notes.align,
       notes.label     = notes.label,
-      lyx.friendly    = lyx.friendly
+      style           = style
     ),
     text = render_ascii(
       table_data,
@@ -457,4 +484,40 @@ normalise_override_list <- function(x, n, arg_name) {
   }
 
   x
+}
+
+# ---------------------------------------------------------------------------
+# Internal helper: style-specific parameter defaults
+# ---------------------------------------------------------------------------
+
+get_style_defaults <- function(style) {
+  switch(style,
+    stargazer2 = list(
+      dep.var.caption = NULL,
+      notes.align     = "l",
+      notes.label     = "\\textit{Note:} ",
+      obs.label       = "Observations"
+    ),
+    stargazer = list(
+      dep.var.caption = NULL,
+      notes.align     = "r",
+      notes.label     = "\\textit{Note:} ",
+      obs.label       = "Observations"
+    ),
+    aer = list(
+      dep.var.caption = "",
+      notes.align     = "l",
+      notes.label     = "\\textit{Notes:} ",
+      obs.label       = "Observations"
+    ),
+    qje = list(
+      dep.var.caption = "",
+      notes.align     = "r",
+      notes.label     = "\\textit{Notes:} ",
+      obs.label       = "\\textit{N}"
+    ),
+    stop("stargazer: unknown style '", style,
+         "'. Must be one of: 'stargazer2', 'stargazer', 'aer', 'qje'.",
+         call. = FALSE)
+  )
 }

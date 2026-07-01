@@ -46,6 +46,8 @@
 #' @param star.cutoffs Numeric vector of p-value thresholds (ascending).
 #' @param star.char    Character vector of star strings.
 #' @param no.space     Logical; suppress blank spacer rows.
+#' @param obs.label    Character; label for the Observations row.  Default
+#'   \code{"Observations"}; set to \code{"\\\\textit\{N\}"} for QJE style.
 #' @keywords internal
 format_table <- function(records,
                          covariate.labels = NULL,
@@ -56,7 +58,8 @@ format_table <- function(records,
                          digits           = 3L,
                          star.cutoffs     = c(0.1, 0.05, 0.01),
                          star.char        = c("*", "**", "***"),
-                         no.space         = FALSE) {
+                         no.space         = FALSE,
+                         obs.label        = "Observations") {
 
   n_cols <- length(records)
 
@@ -78,17 +81,27 @@ format_table <- function(records,
   fe_rows <- build_fe_rows(records)
 
   # --- Fit-statistic rows ---
-  stat_rows <- build_stat_rows(records, omit.stat, digits, star.cutoffs, star.char)
+  stat_rows <- build_stat_rows(records, omit.stat, digits, star.cutoffs, star.char,
+                               obs.label)
 
   # --- SE notes: keep full per-column vector for grouped note formatting ---
   se_labels <- vapply(records, `[[`, character(1L), "se_label")
   se_notes  <- se_labels
 
-  # Standard significance note (matches original stargazer)
+  # Standard significance note (p-value format, matches original stargazer)
   star_note <- paste0(
     "$^{*}$p$<$", star.cutoffs[1L], "; ",
     "$^{**}$p$<$", star.cutoffs[2L], "; ",
     "$^{***}$p$<$", star.cutoffs[3L]
+  )
+
+  # Text-format significance note for AER/QJE styles
+  star_note_text <- paste(
+    vapply(rev(seq_along(star.cutoffs)), function(i) {
+      pct <- round(star.cutoffs[i] * 100)
+      paste0("$^{", star.char[i], "}$Significant at the ", pct, " percent level.")
+    }, character(1L)),
+    collapse = " "
   )
 
   # Mixed SE/CI format legend (only when both types appear in the table)
@@ -118,6 +131,7 @@ format_table <- function(records,
     stat_rows       = stat_rows,
     se_notes        = se_notes,
     star_note       = star_note,
+    star_note_text  = star_note_text,
     ci_col_widths   = ci_col_widths,
     no_space        = no.space
   )
@@ -302,7 +316,8 @@ build_fe_rows <- function(records) {
 #   "f"      F Statistic          (lm only)
 #   "theta"  Dispersion parameter (fenegbin only)
 
-build_stat_rows <- function(records, omit.stat, digits, star.cutoffs, star.char) {
+build_stat_rows <- function(records, omit.stat, digits, star.cutoffs, star.char,
+                           obs.label = "Observations") {
   n_cols <- length(records)
 
   should_show <- function(id) {
@@ -321,7 +336,7 @@ build_stat_rows <- function(records, omit.stat, digits, star.cutoffs, star.char)
   # --- Observations ---
   if (should_show("n")) {
     vals <- vapply(records, function(r) format_nobs(r$nobs), character(1L))
-    rows <- c(rows, list(list(label = "Observations", values = vals, se_values = NULL)))
+    rows <- c(rows, list(list(label = obs.label, values = vals, se_values = NULL)))
   }
 
   # --- R²: overall (lm/feols) or squared-correlation (GLM) ---

@@ -164,7 +164,7 @@ test_that("diff: LaTeX single-model output matches original stargazer", {
   m1    <- lm(lwage ~ educ + exper + tenure, wage1)
 
   orig <- capture_original(list(m1), type = "latex")
-  new2 <- strsplit(stargazer(m1, type = "latex"), "\n")[[1L]]
+  new2 <- strsplit(stargazer(m1, type = "latex", style = "stargazer"), "\n")[[1L]]
 
   # Drop % comments; right-strip trailing spaces; treat whitespace-only lines
   # as equivalent; drop Note: lines (intentional divergence: stargazer2 always
@@ -206,7 +206,7 @@ test_that("diff: LaTeX multi-model output (m1-m4) matches original stargazer", {
                 region + occupation + industry, wage1)
 
   orig <- capture_original(list(m1, m2, m3, m4), type = "latex")
-  new2 <- strsplit(stargazer(m1, m2, m3, m4, type = "latex"), "\n")[[1L]]
+  new2 <- strsplit(stargazer(m1, m2, m3, m4, type = "latex", style = "stargazer"), "\n")[[1L]]
 
   normalise_latex <- function(lines) {
     lines <- lines[!grepl("^%", lines)]
