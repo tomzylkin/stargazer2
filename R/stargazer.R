@@ -384,7 +384,7 @@ parse_single_summary_feglm_call <- function(expr) {
       # Two or more vars: check whether they're interacted (^) or additive (+)
       cl_dep <- deparse(cluster_arg)
       if (grepl("\\^", cl_dep)) {
-        cl_str <- paste(vars, collapse = " x ")
+        cl_str <- paste(vars, collapse = "-")
       } else {
         cl_str <- paste0(paste(vars[-length(vars)], collapse = ", "),
                          " and ", vars[length(vars)])
@@ -449,6 +449,8 @@ parse_single_vcov_call <- function(expr) {
       vars <- all.vars(cluster_arg)
       cl_str <- if (length(vars) == 1L) {
         vars
+      } else if (grepl("\\^", deparse(cluster_arg))) {
+        paste(vars, collapse = "-")
       } else {
         paste0(paste(vars[-length(vars)], collapse = ", "),
                " and ", vars[length(vars)])

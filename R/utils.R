@@ -73,7 +73,7 @@ se_label_from_vcov <- function(vcov_mat) {
     if (!is.null(cl)) {
       vars    <- all.vars(cl)
       cl_str  <- if (grepl("\\^", deparse(cl))) {
-        paste(vars, collapse = " x ")
+        paste(vars, collapse = "-")
       } else if (length(vars) == 1L) {
         vars
       } else {
@@ -171,7 +171,7 @@ se_label_from_fixest_type <- function(vt, method = "feols", vcov_call = NULL) {
     # combine_fixef_keep_names(Origin, Destination) -> Origin x Destination
     vars_str <- gsub(
       "combine_fixef_keep_names\\(([^,]+),\\s*([^)]+)\\)",
-      "\\1 x \\2", vars_str
+      "\\1-\\2", vars_str
     )
     # Two-way: "X & Y" -> "X and Y"
     vars_str <- gsub(" & ", " and ", vars_str, fixed = TRUE)

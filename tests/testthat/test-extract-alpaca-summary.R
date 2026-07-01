@@ -190,12 +190,12 @@ test_that("stargazer: summary.feglm two-way additive cluster label uses 'and'", 
   expect_match(out, "clustered by grp and grp2", fixed = TRUE)
 })
 
-test_that("stargazer: summary.feglm interacted cluster label uses 'x'", {
+test_that("stargazer: summary.feglm interacted cluster label uses '-'", {
   d   <- setup_alpaca_summary_data()
   mod <- alpaca::feglm(y ~ x1 + x2 | grp + grp2, d$logit, binomial("logit"))
   out <- note_text(stargazer(summary(mod, type = "clustered", cluster = ~grp^grp2),
                              type = "text"))
-  expect_match(out, "clustered by grp x grp2", fixed = TRUE)
+  expect_match(out, "clustered by grp-grp2", fixed = TRUE)
 })
 
 # ---------------------------------------------------------------------------

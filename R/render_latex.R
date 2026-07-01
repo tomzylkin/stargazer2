@@ -50,6 +50,18 @@ render_latex <- function(table_data,
 
   lines <- character(0L)
 
+  # --- Comment header ---
+  pkg_ver <- tryCatch(as.character(utils::packageVersion("stargazer2")),
+                      error = function(e) "")
+  ver_str <- if (nchar(pkg_ver) > 0L) paste0(" v.", pkg_ver) else ""
+  lines <- c(lines,
+    paste0("% Table produced by stargazer2", ver_str,
+           " by Tom Zylkin, University of Richmond (tzylkin@richmond.edu)"),
+    paste0("% Original stargazer package by: Hlavac, Marek (2022). stargazer: ",
+           "Well-Formatted Regression and Summary Statistics Tables."),
+    "%   R package version 5.2.3. https://CRAN.R-project.org/package=stargazer"
+  )
+
   # --- Opening ---
   lines <- c(lines, "")
   lines <- c(lines, "\\begin{table}[!htbp] \\centering ")
@@ -227,13 +239,19 @@ build_latex_notes <- function(table_data, notes, notes.append, notes.align,
   # Clean format (stargazer2 / aer / qje): single full-width multicolumn
   # spanning all columns.  All blocks joined with "; ".  Trailing period
   # ensured: if the content ends in ";" replace with ".".
+  #
+  # Column type p{\linewidth} wraps long notes at the page text width, avoiding
+  # overflow into adjacent space.  Alignment within the paragraph is controlled
+  # by a LaTeX prefix: \raggedleft for "r", \centering for "c", nothing for "l".
   ncols   <- nc + 1L
   content <- paste(blocks, collapse = "; ")
   content <- sub(";\\s*$", ".", content)          # trailing ";" → "."
   if (!grepl("\\.$", content)) content <- paste0(content, ".")
 
+  align_prefix <- switch(notes.align, r = "\\raggedleft ", c = "\\centering ", "")
+
   paste0(
-    "\\multicolumn{", ncols, "}{", notes.align, "}{",
-    notes.label, content, "} \\\\ "
+    "\\multicolumn{", ncols, "}{p{\\linewidth}}{",
+    align_prefix, notes.label, content, "} \\\\ "
   )
 }

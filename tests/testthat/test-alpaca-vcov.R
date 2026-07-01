@@ -101,12 +101,12 @@ test_that("vcovAlpacaCL two-way additive gives 'clustered by grp and grp2'", {
                "standard errors clustered by grp and grp2")
 })
 
-test_that("vcovAlpacaCL interaction gives 'clustered by grp x grp2'", {
+test_that("vcovAlpacaCL interaction gives 'clustered by grp-grp2'", {
   d   <- setup_alpaca_vcov_data()
   mod <- alpaca::feglm(y ~ x1 + x2 | grp + grp2, d$logit, binomial("logit"))
   V   <- alpaca_vcovCL(mod, ~grp^grp2)
   expect_equal(stargazer2:::se_label_from_vcov(V),
-               "standard errors clustered by grp x grp2")
+               "standard errors clustered by grp-grp2")
 })
 
 # ---------------------------------------------------------------------------
