@@ -98,17 +98,17 @@ f5 <- feols(lwage ~ educ + exper + tenure + female + married |
               region^industry,      wage1, vcov = ~region^industry)
 ```
 
-The text output gives a clear view of the FE indicator rows:
+A bare call — no labels specified — already produces a complete table.
+`stargazer2` extracts the dependent variable name (`lwage`) from the model
+formula and, since all five columns share the same estimator, omits the
+redundant model-type row:
 
 ```{r fixest-table-text, eval = requireNamespace("wooldridge", quietly = TRUE) && requireNamespace("fixest", quietly = TRUE)}
-stargazer(f1, f2, f3, f4, f5,
-          type             = "text",
-          dep.var.labels   = "log(Wage)",
-          covariate.labels = c("Education", "Experience", "Tenure",
-                               "Female", "Married"))
+stargazer(f1, f2, f3, f4, f5, type = "text")
 ```
 
-And the LaTeX source, ready to paste into a paper:
+Labels can be overridden when needed. The LaTeX source below also renames the
+covariates for presentation:
 
 ```{r fixest-table-latex, eval = requireNamespace("wooldridge", quietly = TRUE) && requireNamespace("fixest", quietly = TRUE)}
 stargazer(f1, f2, f3, f4, f5,
@@ -120,7 +120,7 @@ stargazer(f1, f2, f3, f4, f5,
                                "Female", "Married"))
 ```
 
-Two things to notice:
+Two things to notice in both outputs:
 
 - **FE indicator rows** appear below the coefficient block — one row per unique
   fixed effect across all columns, with "Yes" or "No" per model. The interacted
@@ -161,15 +161,25 @@ gravity_pois2  <- fepois(Euros ~ log(dist_km) |
                          trade, vcov = ~Origin + Destination)
 ```
 
+With no arguments beyond the model list, `stargazer2` automatically extracts
+the dependent variable names from each formula (`log(Euros)` for the OLS model,
+`Euros` for the count models), detects the estimator type for each column (OLS,
+Poisson, Neg. Binomial), and reads the SE method from each model object:
+
+```{r gravity-table-default, eval = requireNamespace("fixest", quietly = TRUE)}
+stargazer(gravity_ols, gravity_pois, gravity_negbin,
+          gravity_pois1, gravity_pois2,
+          type = "text")
+```
+
+The same call in LaTeX produces submission-ready output:
+
 ```{r gravity-table, eval = requireNamespace("fixest", quietly = TRUE)}
 stargazer(gravity_ols, gravity_pois, gravity_negbin,
           gravity_pois1, gravity_pois2,
-          type           = "latex",
-          title          = "Gravity Equation for Trade Flows",
-          label          = "tab:gravity",
-          dep.var.labels = c("log(Euros)", "Euros"),
-          column.labels  = c("OLS", "Poisson", "Neg. Bin.",
-                             "Poisson", "Poisson"))
+          type  = "latex",
+          title = "Gravity Equation for Trade Flows",
+          label = "tab:gravity")
 ```
 
 The SE note shows per-column types: OLS standard errors for column (1), MLE
