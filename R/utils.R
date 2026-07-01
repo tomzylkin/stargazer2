@@ -167,12 +167,13 @@ se_label_from_fixest_type <- function(vt, method = "feols", vcov_call = NULL) {
 
   if (startsWith(vt, "Clustered (")) {
     vars_str <- sub("^Clustered \\((.+)\\)$", "\\1", vt)
-    # Clean up internal fixest interaction notation, e.g.
-    # combine_fixef_keep_names(Origin, Destination) -> Origin x Destination
+    # combine_fixef_keep_names(A, B) -> A-B  (older fixest internal notation)
     vars_str <- gsub(
       "combine_fixef_keep_names\\(([^,]+),\\s*([^)]+)\\)",
       "\\1-\\2", vars_str
     )
+    # A^B -> A-B  (literal ^ when vcov = ~A^B is passed directly)
+    vars_str <- gsub("\\^", "-", vars_str)
     # Two-way: "X & Y" -> "X and Y"
     vars_str <- gsub(" & ", " and ", vars_str, fixed = TRUE)
     return(paste0("standard errors clustered by ", vars_str))
