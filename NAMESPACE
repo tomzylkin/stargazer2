@@ -1,9 +1,10 @@
 export(stargazer)
 export(alpaca_vcovSandwich)
 export(alpaca_vcovCL)
-importFrom(stats, coef, cor, df.residual, fitted, formula, median, nobs,
-           pf, pnorm, pt, quantile, sd, vcov)
+importFrom(stats, AIC, coef, cor, df.residual, family, fitted, formula,
+           logLik, median, nobs, pf, pnorm, pt, quantile, sd, vcov)
 S3method(extract_model, lm)
+S3method(extract_model, glm)
 S3method(extract_model, fixest)
 S3method(extract_model, feglm)
 S3method(extract_model, summary.feglm)

@@ -7,11 +7,12 @@ Authors@R: c(
     person("Tom", "Zylkin", role = c("aut", "cre"),
            email = "tzylkin@richmond.edu"))
 Description: Produces publication-quality LaTeX, ASCII, and HTML regression
-    tables. Designed as a drop-in replacement for the 'stargazer' package
-    with added support for modern econometrics packages including 'fixest'
-    and 'alpaca'. Standard errors can be supplied as variance-covariance
-    matrices, numeric vectors, or auto-extracted from supported model
-    objects.
+    tables. Follows the interface of the 'stargazer' package and is designed
+    to be a drop-in replacement for 'lm' models, with added native support
+    for 'fixest' and 'alpaca' objects including automatic fixed-effect
+    indicator rows and SE-type detection. Standard errors can be supplied as
+    variance-covariance matrices, numeric vectors, or auto-extracted from
+    supported model objects.
 License: GPL-3
 Encoding: UTF-8
 Imports:

@@ -106,6 +106,111 @@ extract_model.lm <- function(model, vcov_override = NULL, se_override = NULL, ..
 }
 
 # ---------------------------------------------------------------------------
+# glm method
+# ---------------------------------------------------------------------------
+
+# Internal helper shared by extract_model.glm.
+glm_model_label <- function(fam, lnk) {
+  if (identical(fam, "gaussian")  && identical(lnk, "identity")) return("OLS")
+  if (identical(fam, "binomial")  && identical(lnk, "logit"))    return("Logit")
+  if (identical(fam, "binomial")  && identical(lnk, "probit"))   return("Probit")
+  if (identical(fam, "poisson")   && identical(lnk, "log"))      return("Poisson")
+  fam_cap <- paste0(toupper(substr(fam, 1L, 1L)), substr(fam, 2L, nchar(fam)))
+  paste0(fam_cap, " (", lnk, ")")
+}
+
+extract_model.glm <- function(model, vcov_override = NULL, se_override = NULL, ...) {
+  fam <- family(model)$family
+  lnk <- family(model)$link
+  is_gaussian_ols <- identical(fam, "gaussian") && identical(lnk, "identity")
+
+  coefs      <- coef(model)
+  coef_names <- sub("^\\(Intercept\\)$", "Constant", names(coefs))
+
+  # --- Standard errors (three-tier precedence) ---
+  if (!is.null(vcov_override)) {
+    se_vals  <- sqrt(diag(vcov_override))
+    se_label <- se_label_from_vcov(vcov_override)
+  } else if (!is.null(se_override)) {
+    se_vals  <- se_override
+    se_label <- "user-specified standard errors"
+  } else {
+    se_vals  <- sqrt(diag(vcov(model)))
+    se_label <- if (is_gaussian_ols) "OLS standard errors" else "MLE standard errors"
+  }
+
+  # --- t (Gaussian OLS) vs z (all other GLMs) statistics ---
+  df_r  <- df.residual(model)
+  tstat <- unname(coefs) / unname(se_vals)
+  pvals <- if (is_gaussian_ols) {
+    2 * pt(-abs(tstat), df = df_r)
+  } else {
+    2 * pnorm(-abs(tstat))
+  }
+
+  # --- Log-likelihood and AIC ---
+  ll_val  <- tryCatch(as.numeric(logLik(model)), error = function(e) NA_real_)
+  aic_val <- tryCatch(AIC(model), error = function(e) NA_real_)
+
+  # --- Fit statistics ---
+  if (is_gaussian_ols) {
+    y   <- model$y
+    if (is.null(y)) y <- fitted(model) + residuals(model)
+    ss_res <- sum(residuals(model)^2)
+    ss_tot <- sum((y - mean(y))^2)
+    r2     <- 1 - ss_res / ss_tot
+    adj_r2 <- 1 - (1 - r2) * (length(y) - 1L) / as.integer(df_r)
+    sigma  <- sqrt(ss_res / as.integer(df_r))
+    k      <- sum(names(coefs) != "(Intercept)")
+    f_val  <- if (k > 0L) (r2 / k) / ((1 - r2) / as.integer(df_r)) else NA_real_
+    f_pval <- if (!is.na(f_val)) pf(f_val, k, as.integer(df_r), lower.tail = FALSE) else NA_real_
+    fit <- list(
+      type        = "ols",
+      r2          = r2,
+      adj_r2      = adj_r2,
+      wr2         = NA_real_,
+      adj_wr2     = NA_real_,
+      sigma       = sigma,
+      df_residual = as.integer(df_r),
+      fstat       = if (k > 0L) unname(f_val) else NA_real_,
+      fstat_df1   = if (k > 0L) as.integer(k)  else NA_integer_,
+      fstat_df2   = as.integer(df_r),
+      fstat_pval  = unname(f_pval),
+      ll          = ll_val,
+      aic         = aic_val
+    )
+  } else {
+    fit <- list(
+      type    = "glm",
+      r2      = NA_real_,
+      adj_r2  = NA_real_,
+      wr2     = NA_real_,
+      adj_wr2 = NA_real_,
+      sigma   = NA_real_,
+      ll      = ll_val,
+      aic     = aic_val
+    )
+  }
+
+  dep_var <- deparse(formula(model)[[2L]])
+
+  list(
+    coef_names    = coef_names,
+    coefs         = unname(coefs),
+    se            = unname(se_vals),
+    tstat         = tstat,
+    pval          = pvals,
+    nobs          = as.integer(nobs(model)),
+    fit           = fit,
+    fixed_effects = character(0L),
+    reports_fe    = TRUE,
+    se_label      = se_label,
+    model_label   = glm_model_label(fam, lnk),
+    dep_var       = dep_var
+  )
+}
+
+# ---------------------------------------------------------------------------
 # fixest method
 # ---------------------------------------------------------------------------
 
@@ -357,7 +462,7 @@ extract_model.default <- function(model, vcov_override = NULL, se_override = NUL
   stop(
     "stargazer2 does not know how to extract results from an object of class: ",
     cls, ".\n",
-    "Supported classes: lm, fixest, feglm (alpaca), summary.feglm (alpaca).",
+    "Supported classes: lm, glm, fixest, feglm (alpaca), summary.feglm (alpaca).",
     call. = FALSE
   )
 }

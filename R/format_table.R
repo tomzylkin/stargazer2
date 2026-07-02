@@ -312,8 +312,10 @@ build_fe_rows <- function(records) {
 #   "n"      Observations
 #   "r2"     R² and Within R² (all model types)
 #   "adj.r2" Adjusted R² and Adjusted Within R² (OLS only)
-#   "sigma"  Residual Std. Error  (lm only)
-#   "f"      F Statistic          (lm only)
+#   "sigma"  Residual Std. Error  (lm / Gaussian glm only)
+#   "f"      F Statistic          (lm / Gaussian glm only)
+#   "ll"     Log Likelihood       (glm only)
+#   "aic"    Akaike Inf. Crit.    (glm only)
 #   "theta"  Dispersion parameter (fenegbin only)
 
 build_stat_rows <- function(records, omit.stat, digits, star.cutoffs, star.char,
@@ -419,7 +421,7 @@ build_stat_rows <- function(records, omit.stat, digits, star.cutoffs, star.char,
     }
   }
 
-  # --- F Statistic (lm only) ---
+  # --- F Statistic (lm / Gaussian glm only) ---
   if (should_show("f")) {
     vals <- vapply(records, function(r) {
       fit <- r$fit
@@ -433,6 +435,32 @@ build_stat_rows <- function(records, omit.stat, digits, star.cutoffs, star.char,
     if (any(vals != "")) {
       rows <- c(rows, list(list(
         label = "F Statistic", values = vals, se_values = NULL
+      )))
+    }
+  }
+
+  # --- Log Likelihood (glm only) ---
+  if (should_show("ll")) {
+    vals <- vapply(records, function(r) {
+      v <- fit_val(r$fit, "ll")
+      if (is.na(v)) "" else formatC(v, digits = digits, format = "f")
+    }, character(1L))
+    if (any(vals != "")) {
+      rows <- c(rows, list(list(
+        label = "Log Likelihood", values = vals, se_values = NULL
+      )))
+    }
+  }
+
+  # --- Akaike Inf. Crit. (glm only) ---
+  if (should_show("aic")) {
+    vals <- vapply(records, function(r) {
+      v <- fit_val(r$fit, "aic")
+      if (is.na(v)) "" else formatC(v, digits = digits, format = "f")
+    }, character(1L))
+    if (any(vals != "")) {
+      rows <- c(rows, list(list(
+        label = "Akaike Inf. Crit.", values = vals, se_values = NULL
       )))
     }
   }

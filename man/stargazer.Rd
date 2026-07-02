@@ -39,8 +39,9 @@ stargazer(
 }
 \arguments{
 \item{...}{One or more fitted model objects.  Supported classes:
-\code{lm}, \code{fixest} (\code{feols}, \code{fepois}, \code{fenegbin},
-\code{feglm}), \code{alpaca::feglm}, and \code{summary.feglm}.}
+\code{lm}, \code{glm}, \code{fixest} (\code{feols}, \code{fepois},
+\code{fenegbin}, \code{feglm}), \code{alpaca::feglm}, and
+\code{summary.feglm}.}
 
 \item{type}{Character; output format.  One of \code{"latex"} (default),
 \code{"text"}, or \code{"html"}.}
@@ -170,8 +171,9 @@ The rendered table as a single character string, returned
   invisibly.  Also printed to the console unless \code{out} is specified.
 }
 \description{
-A drop-in replacement for the \pkg{stargazer} package that supports
-modern econometrics packages including \pkg{fixest} and \pkg{alpaca}.
+Produces publication-quality regression tables, following the interface of
+the \pkg{stargazer} package, with native support for modern econometrics
+packages including \pkg{fixest} and \pkg{alpaca}.
 Outputs LaTeX, plain-text (ASCII), and HTML tables.
 }
 \examples{
