@@ -1,4 +1,5 @@
 ^CLAUDE\.md$
+^\.claude$
 ^README\.md$
 ^cran-comments\.md$
 ^\.git$
