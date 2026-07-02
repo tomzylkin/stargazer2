@@ -16,9 +16,11 @@ pak::pak("tomzylkin/stargazer2")
 
 ## Overview
 
-`stargazer2` is a drop-in replacement for `stargazer`. For `lm` models the
-output is identical to the original. The key additions are:
+`stargazer2` is a drop-in replacement for `stargazer`. For `lm` and `glm`
+models the output is identical to the original. The key additions are:
 
+- **`glm` support** — logit, probit, Poisson, and any other family/link
+  combination; log likelihood and AIC reported automatically.
 - **`fixest` support** — `feols`, `fepois`, `fenegbin`, `feglm`: fixed
   effects reported as indicator rows (not coefficient rows), SE type
   auto-detected from the model object.
