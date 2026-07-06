@@ -278,27 +278,48 @@ build_fe_rows <- function(records) {
     new <- setdiff(rec$fixed_effects, all_fes)
     all_fes <- c(all_fes, new)
   }
-  if (length(all_fes) == 0L) return(list())
 
-  n_cols <- length(records)
-  rows   <- vector("list", length(all_fes))
+  # Collect all unique RE variable names in encounter order
+  all_res <- character(0L)
+  for (rec in records) {
+    re <- rec$random_effects
+    if (!is.null(re) && length(re) > 0L) {
+      new <- setdiff(re, all_res)
+      all_res <- c(all_res, new)
+    }
+  }
 
-  for (j in seq_along(all_fes)) {
-    fe_var <- all_fes[[j]]
+  if (length(all_fes) == 0L && length(all_res) == 0L) return(list())
+
+  rows <- list()
+
+  for (fe_var in all_fes) {
     label  <- format_fe_label(fe_var)
     values <- vapply(records, function(rec) {
       if (fe_var %in% rec$fixed_effects) {
         "Yes"
       } else if (isTRUE(rec$reports_fe)) {
-        # Model uses explicit FE absorption but not this particular variable
         "No"
       } else {
-        # Model does not report FEs (e.g. CS, Roth-Sant'Anna):
-        # leave blank rather than showing misleading "No"
         ""
       }
     }, character(1L))
-    rows[[j]] <- list(label = label, values = values, se_values = NULL)
+    rows <- c(rows, list(list(label = label, values = values, se_values = NULL)))
+  }
+
+  for (re_var in all_res) {
+    label  <- format_re_label(re_var)
+    values <- vapply(records, function(rec) {
+      re <- rec$random_effects
+      if (!is.null(re) && re_var %in% re) {
+        "Yes"
+      } else if (isTRUE(rec$reports_fe)) {
+        "No"
+      } else {
+        ""
+      }
+    }, character(1L))
+    rows <- c(rows, list(list(label = label, values = values, se_values = NULL)))
   }
 
   rows
@@ -430,7 +451,11 @@ build_stat_rows <- function(records, omit.stat, digits, star.cutoffs, star.char,
         formatC(fit$fstat, digits = digits, format = "f"),
         fit$fstat_pval, star.cutoffs, star.char
       )
-      paste0(fstr, " (df = ", fit$fstat_df1, "; ", fit$fstat_df2, ")")
+      if (!is.na(fit$fstat_df1) && !is.na(fit$fstat_df2)) {
+        paste0(fstr, " (df = ", fit$fstat_df1, "; ", fit$fstat_df2, ")")
+      } else {
+        fstr
+      }
     }, character(1L))
     if (any(vals != "")) {
       rows <- c(rows, list(list(

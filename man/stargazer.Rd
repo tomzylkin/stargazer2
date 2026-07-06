@@ -39,9 +39,9 @@ stargazer(
 }
 \arguments{
 \item{...}{One or more fitted model objects.  Supported classes:
-\code{lm}, \code{glm}, \code{fixest} (\code{feols}, \code{fepois},
-\code{fenegbin}, \code{feglm}), \code{alpaca::feglm}, and
-\code{summary.feglm}.}
+\code{lm}, \code{glm}, \code{plm}, \code{fixest} (\code{feols},
+\code{fepois}, \code{fenegbin}, \code{feglm}), \code{alpaca::feglm},
+and \code{summary.feglm}.}
 
 \item{type}{Character; output format.  One of \code{"latex"} (default),
 \code{"text"}, or \code{"html"}.}

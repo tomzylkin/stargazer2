@@ -196,6 +196,16 @@ format_fe_label <- function(fe_var) {
   paste0(paste(formatted, collapse = " x "), " FE")
 }
 
+format_re_label <- function(re_var) {
+  parts <- strsplit(re_var, "^", fixed = TRUE)[[1]]
+  formatted <- vapply(parts, function(p) {
+    p <- trimws(p)
+    if (nchar(p) == 0L) return(p)
+    paste0(toupper(substr(p, 1L, 1L)), substr(p, 2L, nchar(p)))
+  }, character(1L), USE.NAMES = FALSE)
+  paste0(paste(formatted, collapse = " x "), " RE")
+}
+
 # Build the SE-type portion of the table note.
 #
 # se_labels:   character vector of length n_cols (one per column)

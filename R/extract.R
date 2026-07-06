@@ -454,6 +454,136 @@ extract_model.summary.feglm <- function(model, vcov_override = NULL,
 }
 
 # ---------------------------------------------------------------------------
+# plm method
+# ---------------------------------------------------------------------------
+
+plm_model_label <- function(model_type) {
+  switch(model_type,
+    within  = "FE",
+    random  = "RE",
+    pooling = "Pooled OLS",
+    fd      = "FD",
+    between = "Between",
+    toupper(model_type)
+  )
+}
+
+extract_model.plm <- function(model, vcov_override = NULL, se_override = NULL, ...) {
+  if (!requireNamespace("plm", quietly = TRUE)) {
+    stop("Package 'plm' is required but not installed.", call. = FALSE)
+  }
+
+  s          <- summary(model)
+  coefs      <- coef(model)
+  coef_names <- sub("^\\(Intercept\\)$", "Constant", names(coefs))
+
+  # --- Standard errors (three-tier precedence) ---
+  if (!is.null(vcov_override)) {
+    se_vals  <- sqrt(diag(vcov_override))
+    se_label <- se_label_from_vcov(vcov_override)
+  } else if (!is.null(se_override)) {
+    se_vals  <- se_override
+    se_label <- "user-specified standard errors"
+  } else {
+    se_vals  <- sqrt(diag(vcov(model)))
+    se_label <- "OLS standard errors"
+  }
+
+  # t-statistics and p-values
+  df_r  <- df.residual(model)
+  tstat <- unname(coefs) / unname(se_vals)
+  pvals <- 2 * pt(-abs(tstat), df = df_r)
+
+  # --- Model type and effect ---
+  model_type <- model$args$model
+  effect     <- if (!is.null(model$args$effect)) model$args$effect else "individual"
+
+  # --- Panel index variable names ---
+  idx      <- attr(model$model, "index")
+  idx_vars <- names(idx)
+  ind_var  <- idx_vars[1L]
+  time_var <- idx_vars[2L]
+
+  # --- Fixed effects (within models only) ---
+  fixed_effects <- if (identical(model_type, "within")) {
+    if (identical(effect, "twoways")) {
+      c(ind_var, time_var)
+    } else if (identical(effect, "time")) {
+      time_var
+    } else {
+      ind_var
+    }
+  } else {
+    character(0L)
+  }
+
+  # --- Random effects (RE models only) ---
+  random_effects <- if (identical(model_type, "random")) {
+    if (identical(effect, "twoways")) {
+      c(ind_var, time_var)
+    } else if (identical(effect, "time")) {
+      time_var
+    } else {
+      ind_var
+    }
+  } else {
+    character(0L)
+  }
+
+  # --- Fit statistics ---
+  r2_vec <- s$r.squared
+  r2     <- if (!is.null(r2_vec) && length(r2_vec) >= 1L) r2_vec[[1L]] else NA_real_
+  adj_r2 <- if (!is.null(r2_vec) && length(r2_vec) >= 2L) r2_vec[[2L]] else NA_real_
+
+  fstat_h    <- s$fstatistic
+  fstat_val  <- if (!is.null(fstat_h)) unname(fstat_h$statistic) else NA_real_
+  fstat_df1  <- if (!is.null(fstat_h) && "df1" %in% names(fstat_h$parameter)) {
+    as.integer(fstat_h$parameter["df1"])
+  } else NA_integer_
+  fstat_df2  <- if (!is.null(fstat_h) && "df2" %in% names(fstat_h$parameter)) {
+    as.integer(fstat_h$parameter["df2"])
+  } else NA_integer_
+  fstat_pval <- if (!is.null(fstat_h)) fstat_h$p.value else NA_real_
+
+  sigma <- tryCatch(
+    sqrt(sum(residuals(model)^2) / df_r),
+    error = function(e) NA_real_
+  )
+
+  fit <- list(
+    type        = "ols",
+    r2          = r2,
+    adj_r2      = adj_r2,
+    wr2         = NA_real_,
+    adj_wr2     = NA_real_,
+    sigma       = sigma,
+    df_residual = as.integer(df_r),
+    fstat       = fstat_val,
+    fstat_df1   = fstat_df1,
+    fstat_df2   = fstat_df2,
+    fstat_pval  = fstat_pval
+  )
+
+  dep_var <- deparse(formula(model)[[2L]])
+
+  list(
+    coef_names     = coef_names,
+    coefs          = unname(coefs),
+    se             = unname(se_vals),
+    tstat          = unname(tstat),
+    pval           = unname(pvals),
+    nobs           = as.integer(nobs(model)),
+    fit            = fit,
+    fixed_effects  = fixed_effects,
+    random_effects = random_effects,
+    reports_fe     = TRUE,
+    se_label       = se_label,
+    model_label    = plm_model_label(model_type),
+    dep_var        = dep_var
+  )
+}
+
+# ---------------------------------------------------------------------------
 # default method — informative error
 # ---------------------------------------------------------------------------
 
@@ -462,7 +592,7 @@ extract_model.default <- function(model, vcov_override = NULL, se_override = NUL
   stop(
     "stargazer2 does not know how to extract results from an object of class: ",
     cls, ".\n",
-    "Supported classes: lm, glm, fixest, feglm (alpaca), summary.feglm (alpaca).",
+    "Supported classes: lm, glm, fixest, feglm (alpaca), summary.feglm (alpaca), plm.",
     call. = FALSE
   )
 }

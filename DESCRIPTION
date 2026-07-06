@@ -20,6 +20,7 @@ Imports:
 Suggests:
     fixest (>= 0.11.0),
     alpaca,
+    plm,
     sandwich,
     wooldridge,
     stargazer,

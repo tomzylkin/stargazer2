@@ -1,0 +1,105 @@
+---
+title: "Panel Data Models with plm"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Panel Data Models with plm}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment  = "",
+  message  = FALSE,
+  warning  = FALSE
+)
+library(stargazer2)
+```
+
+`stargazer2` supports `plm` model objects natively. It auto-detects the
+estimator type (FE, RE, Pooled OLS, FD, Between), displays fixed-effect and
+random-effect indicator rows, and reports the appropriate fit statistics from
+`summary.plm`.
+
+## Dataset and models
+
+The `Grunfeld` dataset (10 US manufacturing firms, 1935--1954, balanced panel)
+is included with `plm`. We estimate four specifications of an investment
+equation:
+
+```{r models, eval = requireNamespace("plm", quietly = TRUE)}
+library(plm)
+data("Grunfeld", package = "plm")
+
+m_pool <- plm(inv ~ value + capital, Grunfeld,
+              index = c("firm", "year"), model = "pooling")
+
+m_fe   <- plm(inv ~ value + capital, Grunfeld,
+              index = c("firm", "year"), model = "within")
+
+m_twfe <- plm(inv ~ value + capital, Grunfeld,
+              index = c("firm", "year"), model = "within", effect = "twoways")
+
+m_re   <- plm(inv ~ value + capital, Grunfeld,
+              index = c("firm", "year"), model = "random")
+```
+
+## Default output
+
+A bare call produces a complete table. `stargazer2` reads the model type from
+each `plm` object and builds indicator rows for the fixed and random effects
+present across all columns:
+
+```{r default-text, eval = requireNamespace("plm", quietly = TRUE)}
+stargazer(m_pool, m_fe, m_twfe, m_re, type = "text")
+```
+
+Things to notice:
+
+- **Model-type row** identifies each column as Pooled OLS, FE, or RE.
+- **Firm FE** and **Year FE** rows track which specifications absorb each
+  set of fixed effects. Both show "Yes" only in the two-way FE column.
+- **Firm RE** row shows "Yes" for the random-effects column and "No"
+  elsewhere.
+- The **Constant** disappears from the FE columns — the within transformation
+  absorbs it.
+- The RE column's F statistic is a Wald chi-square test and is shown without
+  degrees-of-freedom annotation.
+
+## Robust standard errors
+
+`plm` ships its own vcov functions. Pass them through the `vcov` argument
+exactly as with `lm` or `fixest` models. `vcovHC(..., method = "arellano")`
+gives standard errors clustered by the individual unit, the most common choice
+for FE models in applied work:
+
+```{r robust-text, eval = requireNamespace("plm", quietly = TRUE)}
+V_fe   <- vcovHC(m_fe,   method = "arellano")
+V_twfe <- vcovHC(m_twfe, method = "arellano")
+
+stargazer(m_fe, m_twfe,
+          type     = "text",
+          vcov     = list(V_fe, V_twfe),
+          se_label = "Arellano cluster-robust standard errors")
+```
+
+Because `plm::vcovHC` returns a plain matrix with no class attribute,
+`stargazer2` cannot auto-detect the SE type. Supply `se_label =` explicitly
+for a precise table note, as shown above.
+
+## Adding formatting options
+
+Once the defaults look right, labels can be added. The LaTeX source below
+sets a title and cross-reference label, renames the dependent variable and
+covariates, and assigns custom column headers:
+
+```{r formatted-latex, eval = requireNamespace("plm", quietly = TRUE)}
+stargazer(m_pool, m_fe, m_twfe, m_re,
+          type             = "latex",
+          title            = "Investment Equations: Grunfeld Panel Data",
+          label            = "tab:grunfeld",
+          dep.var.labels   = "Investment",
+          covariate.labels = c("Market Value", "Capital Stock"),
+          column.labels    = c("Pooled OLS", "FE", "Two-way FE", "RE"))
+```

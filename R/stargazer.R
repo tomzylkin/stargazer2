@@ -6,9 +6,9 @@
 #' Outputs LaTeX, plain-text (ASCII), and HTML tables.
 #'
 #' @param ...  One or more fitted model objects.  Supported classes:
-#'   \code{lm}, \code{glm}, \code{fixest} (\code{feols}, \code{fepois},
-#'   \code{fenegbin}, \code{feglm}), \code{alpaca::feglm}, and
-#'   \code{summary.feglm}.
+#'   \code{lm}, \code{glm}, \code{plm}, \code{fixest} (\code{feols},
+#'   \code{fepois}, \code{fenegbin}, \code{feglm}), \code{alpaca::feglm},
+#'   and \code{summary.feglm}.
 #'
 #' @param type Character; output format.  One of \code{"latex"} (default),
 #'   \code{"text"}, or \code{"html"}.
@@ -182,7 +182,8 @@ stargazer <- function(...,
   # Accept a pre-packed list as the first argument (common pattern).
   # Do NOT unwrap known model/result classes.
   if (length(models) == 1L && is.list(models[[1L]]) &&
-      !inherits(models[[1L]], c("lm", "fixest", "feglm", "summary.feglm"))) {
+      !inherits(models[[1L]], c("lm", "fixest", "feglm", "summary.feglm",
+                                "plm", "panelmodel"))) {
     models <- models[[1L]]
   }
 
