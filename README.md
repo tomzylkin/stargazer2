@@ -24,6 +24,9 @@ models the output is identical to the original. The key additions are:
 - **`fixest` support** — `feols`, `fepois`, `fenegbin`, `feglm`: fixed
   effects reported as indicator rows (not coefficient rows), SE type
   auto-detected from the model object.
+- **`plm` support** — pooled OLS, fixed effects (`within`), random effects,
+  first differences, and between estimators; FE and RE indicator rows
+  auto-populated from the panel index.
 - **`alpaca` support** — `feglm` via `alpaca_vcovSandwich()` and
   `alpaca_vcovCL()` helpers.
 - **`vcov` argument** — pass any list of vcov matrices; the SE type is
@@ -65,14 +68,14 @@ standard errors."*
 ```r
 library(fixest)
 
-f1 <- feols(log(Euros) ~ log(dist_km) | Origin + Destination, trade)
-f2 <- fepois(Euros     ~ log(dist_km) | Origin + Destination, trade)
+f1 <- feols(log(Euros) ~ log(dist_km) | Origin + Destination, trade, vcov = "HC1")
+f2 <- fepois(Euros     ~ log(dist_km) | Origin + Destination, trade, vcov = "HC1")
 
 stargazer(f1, f2, type = "text")
 ```
 
-Fixed effects appear as "Yes / No" indicator rows; the SE type (IID, robust,
-or clustered) is read directly from the model.
+Fixed effects appear as "Yes / No" indicator rows; the SE type is read
+directly from the model and reported in the table note automatically.
 
 ## Credits
 

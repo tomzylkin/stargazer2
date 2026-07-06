@@ -69,24 +69,35 @@ Things to notice:
 
 ## Robust standard errors
 
-`plm` ships its own vcov functions. Pass them through the `vcov` argument
-exactly as with `lm` or `fixest` models. `vcovHC(..., method = "arellano")`
-gives standard errors clustered by the individual unit, the most common choice
-for FE models in applied work:
+`plm` ships its own vcov functions. Pass them inline through the `vcov`
+argument. `vcovHC(..., method = "arellano")` gives standard errors clustered
+by the individual unit, the most common choice for FE models:
 
-```{r robust-text, eval = requireNamespace("plm", quietly = TRUE)}
-V_fe   <- vcovHC(m_fe,   method = "arellano")
-V_twfe <- vcovHC(m_twfe, method = "arellano")
-
+```{r arellano-text, eval = requireNamespace("plm", quietly = TRUE)}
 stargazer(m_fe, m_twfe,
-          type     = "text",
-          vcov     = list(V_fe, V_twfe),
-          se_label = "Arellano cluster-robust standard errors")
+          type = "text",
+          vcov = list(vcovHC(m_fe,   method = "arellano"),
+                      vcovHC(m_twfe, method = "arellano")))
 ```
 
-Because `plm::vcovHC` returns a plain matrix with no class attribute,
-`stargazer2` cannot auto-detect the SE type. Supply `se_label =` explicitly
-for a precise table note, as shown above.
+`stargazer2` auto-detects the SE type from the inline call and labels the
+table note accordingly. For replication of Stata's `vce(cluster id)` results,
+`sandwich::vcovCL` is preferable as it applies the G/(G−1) small-sample
+correction that Stata uses; `plm::vcovHC` applies a heteroskedasticity-style
+n/(n−k) correction instead.
+
+## Driscoll-Kraay standard errors
+
+For panels with cross-sectional dependence or long time dimensions,
+Driscoll-Kraay (spatial HAC) standard errors are a common alternative.
+`plm::vcovSCC` implements this estimator:
+
+```{r dk-text, eval = requireNamespace("plm", quietly = TRUE)}
+stargazer(m_fe, m_twfe,
+          type = "text",
+          vcov = list(vcovSCC(m_fe),
+                      vcovSCC(m_twfe)))
+```
 
 ## Adding formatting options
 

@@ -439,6 +439,29 @@ parse_single_vcov_call <- function(expr) {
   fn <- sub("^.*::", "", fn)   # strip namespace prefix (e.g. sandwich::vcovHC)
 
   if (fn == "vcovHC") {
+    # plm::vcovHC uses 'method'; sandwich::vcovHC uses 'type'.
+    # Check method first so plm calls are handled correctly even when
+    # the namespace prefix is absent.
+    method_arg <- expr[["method"]]
+    if (!is.null(method_arg)) {
+      method_str <- as.character(method_arg)
+      if (identical(method_str, "arellano")) {
+        type_arg <- expr[["type"]]
+        if (!is.null(type_arg)) {
+          return(paste0("Arellano ", as.character(type_arg),
+                        " cluster-robust standard errors"))
+        }
+        return("Arellano cluster-robust standard errors")
+      }
+      # white1 / white2: heteroskedasticity-robust only
+      type_arg <- expr[["type"]]
+      if (!is.null(type_arg)) {
+        return(paste0(as.character(type_arg),
+                      " heteroskedasticity-robust standard errors"))
+      }
+      return("heteroskedasticity-robust standard errors")
+    }
+    # sandwich::vcovHC — no method arg, use type
     type_arg <- expr[["type"]]
     if (!is.null(type_arg)) {
       return(paste0(as.character(type_arg),
@@ -463,6 +486,11 @@ parse_single_vcov_call <- function(expr) {
     }
     return("clustered standard errors")
   }
+
+  # plm-specific vcov functions
+  if (fn == "vcovSCC") return("Driscoll-Kraay standard errors")
+  if (fn == "vcovBK")  return("Beck-Katz standard errors")
+  if (fn == "vcovDC")  return("double-clustered standard errors")
 
   NA_character_
 }

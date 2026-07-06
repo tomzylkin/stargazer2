@@ -26,14 +26,17 @@ m_re   <- plm(inv ~ value + capital, Grunfeld,
 ## ----default-text, eval = requireNamespace("plm", quietly = TRUE)-------------
 stargazer(m_pool, m_fe, m_twfe, m_re, type = "text")
 
-## ----robust-text, eval = requireNamespace("plm", quietly = TRUE)--------------
-V_fe   <- vcovHC(m_fe,   method = "arellano")
-V_twfe <- vcovHC(m_twfe, method = "arellano")
-
+## ----arellano-text, eval = requireNamespace("plm", quietly = TRUE)------------
 stargazer(m_fe, m_twfe,
-          type     = "text",
-          vcov     = list(V_fe, V_twfe),
-          se_label = "Arellano cluster-robust standard errors")
+          type = "text",
+          vcov = list(vcovHC(m_fe,   method = "arellano"),
+                      vcovHC(m_twfe, method = "arellano")))
+
+## ----dk-text, eval = requireNamespace("plm", quietly = TRUE)------------------
+stargazer(m_fe, m_twfe,
+          type = "text",
+          vcov = list(vcovSCC(m_fe),
+                      vcovSCC(m_twfe)))
 
 ## ----formatted-latex, eval = requireNamespace("plm", quietly = TRUE)----------
 stargazer(m_pool, m_fe, m_twfe, m_re,
