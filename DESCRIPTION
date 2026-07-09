@@ -12,7 +12,8 @@ Description: Produces publication-quality LaTeX, ASCII, and HTML regression
     'plm', and 'alpaca' objects including automatic fixed-effect and
     random-effect indicator rows and SE-type detection. Standard errors can
     be supplied as variance-covariance matrices, numeric vectors, or
-    auto-extracted from supported model objects.
+    auto-extracted from supported model objects. Follows the interface of
+    Hlavac (2022) <https://CRAN.R-project.org/package=stargazer>.
 License: GPL-3
 Encoding: UTF-8
 Imports:

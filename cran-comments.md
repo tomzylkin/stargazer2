@@ -1,12 +1,14 @@
 ## Resubmission
 
-This is a resubmission addressing two issues flagged in the initial review:
+This is a resubmission addressing two issues flagged in the second review:
 
-1. **`.claude` directory** — excluded from the built package via `.Rbuildignore`.
+1. **References in DESCRIPTION** — added Hlavac (2022)
+   <https://CRAN.R-project.org/package=stargazer> as a reference in the
+   Description field, following the format requested by CRAN.
 
-2. **No prebuilt vignette index / missing `inst/doc`** — Pandoc is now
-   installed; vignettes are pre-built and `inst/doc/` is included in the
-   source package.
+2. **Missing `\value` tag in `extract_model.Rd`** — added a `@return`
+   roxygen tag to the `extract_model` generic documenting the structure
+   and meaning of the returned model record list.
 
 ## R CMD check results
 

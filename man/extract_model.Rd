@@ -17,6 +17,29 @@ extract_model(model, vcov_override = NULL, se_override = NULL, ...)
 
 \item{...}{Currently unused.}
 }
+\value{
+A named list (model record) with the following fields:
+  \describe{
+    \item{coef_names}{Character vector of coefficient display names.}
+    \item{coefs}{Numeric vector of coefficient estimates.}
+    \item{se}{Numeric vector of standard errors.}
+    \item{tstat}{Numeric vector of t- or z-statistics.}
+    \item{pval}{Numeric vector of two-sided p-values.}
+    \item{nobs}{Integer; number of observations.}
+    \item{fit}{Named list of fit statistics (R-squared, F-statistic,
+      log-likelihood, etc.; content varies by model type).}
+    \item{fixed_effects}{Character vector of fixed-effect variable names;
+      \code{character(0)} if none.}
+    \item{reports_fe}{Logical; \code{TRUE} for models that absorb fixed
+      effects.}
+    \item{se_label}{Character; human-readable description of the SE type
+      for use in the table note.}
+    \item{model_label}{Character; estimator name for the column header
+      (e.g. \code{"OLS"}, \code{"Logit"}, \code{"FE"}).}
+    \item{dep_var}{Character; dependent variable name extracted from the
+      model formula.}
+  }
+}
 \description{
 Internal S3 generic consumed by \code{\link{format_table}}.  Not intended
 for direct use.
