@@ -59,6 +59,9 @@
 #' @param font.size Character; LaTeX font-size command (e.g.
 #'   \code{"small"}, \code{"footnotesize"}).  \code{NULL} (default) means no
 #'   size command is inserted.
+#' @param df Logical; if \code{TRUE} (default), display degrees of freedom
+#'   alongside the Residual Std. Error and F Statistic rows.  Set to
+#'   \code{FALSE} to suppress the \code{(df = ...)} suffixes.
 #' @param no.space Logical; suppress blank spacer rows in the table body.
 #'   Only affects \code{style = "stargazer"}.  Default: \code{FALSE}.
 #' @param style Character; table formatting style.  Controls overall layout,
@@ -139,6 +142,7 @@ stargazer <- function(...,
                       notes.align      = NULL,
                       notes.label      = NULL,
                       font.size        = NULL,
+                      df               = TRUE,
                       no.space         = FALSE,
                       style            = "stargazer2",
                       obs.label        = NULL,
@@ -273,7 +277,8 @@ stargazer <- function(...,
     star.cutoffs     = star.cutoffs,
     star.char        = star.char,
     no.space         = no.space,
-    obs.label        = obs.label
+    obs.label        = obs.label,
+    df               = df
   )
 
   # --- Default dep.var.caption: style can suppress it (empty string), or

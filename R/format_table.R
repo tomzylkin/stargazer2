@@ -59,7 +59,8 @@ format_table <- function(records,
                          star.cutoffs     = c(0.1, 0.05, 0.01),
                          star.char        = c("*", "**", "***"),
                          no.space         = FALSE,
-                         obs.label        = "Observations") {
+                         obs.label        = "Observations",
+                         df               = TRUE) {
 
   n_cols <- length(records)
 
@@ -82,7 +83,7 @@ format_table <- function(records,
 
   # --- Fit-statistic rows ---
   stat_rows <- build_stat_rows(records, omit.stat, digits, star.cutoffs, star.char,
-                               obs.label)
+                               obs.label, df)
 
   # --- SE notes: keep full per-column vector for grouped note formatting ---
   se_labels <- vapply(records, `[[`, character(1L), "se_label")
@@ -340,7 +341,7 @@ build_fe_rows <- function(records) {
 #   "theta"  Dispersion parameter (fenegbin only)
 
 build_stat_rows <- function(records, omit.stat, digits, star.cutoffs, star.char,
-                           obs.label = "Observations") {
+                           obs.label = "Observations", df = TRUE) {
   n_cols <- length(records)
 
   should_show <- function(id) {
@@ -432,8 +433,8 @@ build_stat_rows <- function(records, omit.stat, digits, star.cutoffs, star.char,
     vals <- vapply(records, function(r) {
       fit <- r$fit
       if (is.null(fit$sigma) || is.na(fit$sigma)) return("")
-      paste0(formatC(fit$sigma, digits = digits, format = "f"),
-             " (df = ", fit$df_residual, ")")
+      val <- formatC(fit$sigma, digits = digits, format = "f")
+      if (isTRUE(df)) paste0(val, " (df = ", fit$df_residual, ")") else val
     }, character(1L))
     if (any(vals != "")) {
       rows <- c(rows, list(list(
@@ -451,7 +452,7 @@ build_stat_rows <- function(records, omit.stat, digits, star.cutoffs, star.char,
         formatC(fit$fstat, digits = digits, format = "f"),
         fit$fstat_pval, star.cutoffs, star.char
       )
-      if (!is.na(fit$fstat_df1) && !is.na(fit$fstat_df2)) {
+      if (isTRUE(df) && !is.na(fit$fstat_df1) && !is.na(fit$fstat_df2)) {
         paste0(fstr, " (df = ", fit$fstat_df1, "; ", fit$fstat_df2, ")")
       } else {
         fstr

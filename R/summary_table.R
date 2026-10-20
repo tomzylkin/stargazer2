@@ -43,6 +43,24 @@ stargazer_summary <- function(data,
                                notes.label  = "",
                                out          = NULL) {
 
+  # --- Correlation matrix shortcut ---
+  # Detect square, symmetric matrices with 1s on the diagonal and render as
+
+  # an NxN grid of correlation values (matching original stargazer behaviour).
+  if (is.matrix(data) && is_correlation_matrix(data)) {
+    output <- switch(type,
+      latex = render_corr_latex(data, title, label, font.size, digits, notes),
+      text  = render_corr_ascii(data, title, digits, notes),
+      stop("stargazer: type must be one of 'latex', 'text', 'html'.", call. = FALSE)
+    )
+    if (!is.null(out)) {
+      writeLines(output, con = out)
+    } else {
+      cat(output, "\n")
+    }
+    return(invisible(output))
+  }
+
   # --- Determine which statistics to report ---
   if (!is.null(summary.stat)) {
     stats <- summary.stat
@@ -303,6 +321,154 @@ render_summary_ascii <- function(rows, stat_headers, title, notes) {
     note_text <- paste(notes, collapse = "; ")
     lines <- c(lines, formatC(note_text, width = -total_w))
   }
+
+  paste(lines, collapse = "\n")
+}
+
+# ---------------------------------------------------------------------------
+# Correlation matrix support
+# ---------------------------------------------------------------------------
+
+# Detect whether a matrix is a correlation matrix:
+# square, symmetric, 1s on the diagonal.
+is_correlation_matrix <- function(m) {
+  if (!is.matrix(m)) return(FALSE)
+  if (nrow(m) != ncol(m)) return(FALSE)
+  if (!is.numeric(m)) return(FALSE)
+  if (!isTRUE(all.equal(unname(diag(m)), rep(1, nrow(m)), tolerance = 1e-10))) return(FALSE)
+  if (!isSymmetric(m, tol = 1e-10)) return(FALSE)
+  TRUE
+}
+
+# Format a correlation value for display.
+format_corr_val <- function(x, digits) {
+  if (is.na(x)) return("")
+  if (x == 1) return("1")
+  fmt <- formatC(abs(x), digits = digits, format = "f")
+  if (x < 0) paste0("-", fmt) else fmt
+}
+
+# ASCII renderer for correlation matrices.
+render_corr_ascii <- function(m, title, digits, notes) {
+  var_names <- colnames(m)
+  if (is.null(var_names)) var_names <- paste0("V", seq_len(ncol(m)))
+  n <- length(var_names)
+
+  # Format all values
+  vals <- matrix(NA_character_, n, n)
+  for (i in seq_len(n)) {
+    for (j in seq_len(n)) {
+      vals[i, j] <- format_corr_val(m[i, j], digits)
+    }
+  }
+
+  # Column widths: max of header and values in each column
+  col_w <- vapply(seq_len(n), function(j) {
+    max(nchar(var_names[j]),
+        max(nchar(vals[, j])),
+        1L, na.rm = TRUE)
+  }, integer(1L))
+
+  # Row label width: max of row names and empty header cell
+  label_w <- max(nchar(var_names), 1L, na.rm = TRUE)
+
+  val_area <- sum(col_w) + (n - 1L) * 1L
+  total_w  <- label_w + 1L + val_area
+
+  dbl_line <- strrep("=", total_w)
+  sep_line <- strrep("-", total_w)
+
+  lines <- character(0L)
+  lines <- c(lines, "")
+
+  if (!is.null(title) && nchar(title) > 0L) {
+    lines <- c(lines, title)
+  }
+
+  lines <- c(lines, dbl_line)
+
+  # Header row: blank label + column names
+  header_label <- formatC("", width = label_w, flag = "-")
+  header_cells <- mapply(function(h, w) centre_in(h, w),
+                         var_names, col_w, SIMPLIFY = TRUE)
+  lines <- c(lines, paste0(header_label, " ", paste(header_cells, collapse = " ")))
+  lines <- c(lines, sep_line)
+
+  # Data rows
+  for (i in seq_len(n)) {
+    label_cell <- formatC(var_names[i], width = label_w, flag = "-")
+    val_cells  <- mapply(function(v, w) centre_in(v, w),
+                         vals[i, ], col_w, SIMPLIFY = TRUE)
+    lines <- c(lines, paste0(label_cell, " ", paste(val_cells, collapse = " ")))
+  }
+
+  lines <- c(lines, sep_line)
+
+  if (!is.null(notes) && length(notes) > 0L) {
+    note_text <- paste(notes, collapse = "; ")
+    lines <- c(lines, formatC(note_text, width = -total_w))
+  }
+
+  paste(lines, collapse = "\n")
+}
+
+# LaTeX renderer for correlation matrices.
+render_corr_latex <- function(m, title, label, font.size, digits, notes) {
+  var_names <- colnames(m)
+  if (is.null(var_names)) var_names <- paste0("V", seq_len(ncol(m)))
+  n <- length(var_names)
+
+  col_spec <- paste0(
+    "@{\\extracolsep{5pt}}l",
+    paste(rep("c", n), collapse = "")
+  )
+
+  lines <- character(0L)
+  lines <- c(lines, "")
+  lines <- c(lines, "\\begin{table}[!htbp] \\centering ")
+  if (!is.null(font.size) && nchar(font.size) > 0L) {
+    lines <- c(lines, paste0("  \\", font.size))
+  }
+  lines <- c(lines, paste0("  \\caption{", title, "} "))
+  lines <- c(lines, paste0("  \\label{", label, "} "))
+  lines <- c(lines, paste0("\\begin{tabular}{", col_spec, "} "))
+  lines <- c(lines, "\\\\[-1.8ex]\\hline ")
+  lines <- c(lines, "\\hline \\\\[-1.8ex] ")
+
+  # Header row
+  header_cells <- vapply(var_names, function(h) {
+    paste0("\\multicolumn{1}{c}{", latex_escape(h), "}")
+  }, character(1L))
+  lines <- c(lines, paste0(
+    " & ", paste(header_cells, collapse = " & "), " \\\\ "
+  ))
+  lines <- c(lines, "\\hline \\\\[-1.8ex] ")
+
+  # Data rows
+  for (i in seq_len(n)) {
+    row_vals <- vapply(seq_len(n), function(j) {
+      x <- m[i, j]
+      if (x == 1) return("1")
+      format_num(x, digits)
+    }, character(1L))
+    lines <- c(lines, paste0(
+      latex_escape(var_names[i]), " & ",
+      paste(row_vals, collapse = " & "), " \\\\ "
+    ))
+  }
+
+  lines <- c(lines, "\\hline \\\\[-1.8ex] ")
+
+  if (!is.null(notes) && length(notes) > 0L) {
+    n_cols_all <- n + 1L
+    note_text <- paste(notes, collapse = "; ")
+    lines <- c(lines, paste0(
+      "\\multicolumn{", n_cols_all, "}{l}{", note_text, "} \\\\ "
+    ))
+  }
+
+  lines <- c(lines, "\\end{tabular} ")
+  lines <- c(lines, "\\end{table}")
 
   paste(lines, collapse = "\n")
 }
