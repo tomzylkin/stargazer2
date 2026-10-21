@@ -448,6 +448,7 @@ render_corr_latex <- function(m, title, label, font.size, digits, notes) {
   for (i in seq_len(n)) {
     row_vals <- vapply(seq_len(n), function(j) {
       x <- m[i, j]
+      if (is.na(x)) return("")
       if (x == 1) return("1")
       format_num(x, digits)
     }, character(1L))

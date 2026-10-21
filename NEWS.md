@@ -1,3 +1,16 @@
+# stargazer2 0.1.1
+
+## New features
+
+* `df` argument to `stargazer()`: set `df = FALSE` to suppress the
+  `(df = ...)` suffixes on the Residual Std. Error and F Statistic rows,
+  matching original `stargazer` behavior.
+
+* Correlation matrices (square, symmetric, with 1s on the diagonal) passed
+  to `stargazer()` are now detected automatically and rendered as an N x N
+  grid, matching original `stargazer` behavior, in both `"text"` and
+  `"latex"` output.
+
 # stargazer2 0.1.0
 
 Initial CRAN release.

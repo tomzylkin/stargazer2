@@ -15,7 +15,8 @@ format_table(
   star.cutoffs = c(0.1, 0.05, 0.01),
   star.char = c("*", "**", "***"),
   no.space = FALSE,
-  obs.label = "Observations"
+  obs.label = "Observations",
+  df = TRUE
 )
 }
 \arguments{
