@@ -6,3 +6,4 @@
 ^\.Rbuildignore$
 ^.*\.Rproj$
 ^\.Rproj\.user$
+^se_demo\.R$
