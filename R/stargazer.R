@@ -107,12 +107,11 @@
 #'   \code{"Heteroskedasticity-robust standard errors (HC1)"},
 #'   \code{"Standard errors clustered by firm"}.
 #'
-#' @param out Character; file path.  If provided, output is written to the
-#'   file (appending the appropriate extension if absent).  The table string
-#'   is also returned invisibly.
+#' @param out Character; file path.  If provided, output is also written to
+#'   the file (appending the appropriate extension if absent).
 #'
 #' @return The rendered table as a single character string, returned
-#'   invisibly.  Also printed to the console unless \code{out} is specified.
+#'   invisibly.  Always printed to the console.
 #'
 #' @examples
 #' m1 <- lm(mpg ~ cyl + hp, mtcars)
@@ -331,10 +330,9 @@ stargazer <- function(...,
   )
 
   # --- Output ---
+  cat(output, "\n")
   if (!is.null(out)) {
     writeLines(output, con = out)
-  } else {
-    cat(output, "\n")
   }
 
   invisible(output)

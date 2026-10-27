@@ -1,3 +1,11 @@
+# stargazer2 0.1.2
+
+## Bug fixes
+
+* `stargazer()` now always prints output to the console, even when `out` is
+  specified. Previously, specifying `out` suppressed console output. This
+  matches the behavior of the original `stargazer` package.
+
 # stargazer2 0.1.1
 
 ## New features

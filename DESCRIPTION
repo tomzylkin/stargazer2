@@ -1,8 +1,8 @@
 Package: stargazer2
 Type: Package
 Title: Beautiful Regression Tables for Modern Econometrics Packages
-Version: 0.1.1
-Date: 2026-10-20
+Version: 0.1.2
+Date: 2026-10-27
 Authors@R: c(
     person("Tom", "Zylkin", role = c("aut", "cre"),
            email = "tzylkin@richmond.edu"))

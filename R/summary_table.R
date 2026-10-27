@@ -53,10 +53,9 @@ stargazer_summary <- function(data,
       text  = render_corr_ascii(data, title, digits, notes),
       stop("stargazer: type must be one of 'latex', 'text', 'html'.", call. = FALSE)
     )
+    cat(output, "\n")
     if (!is.null(out)) {
       writeLines(output, con = out)
-    } else {
-      cat(output, "\n")
     }
     return(invisible(output))
   }
@@ -120,10 +119,9 @@ stargazer_summary <- function(data,
     stop("stargazer: type must be one of 'latex', 'text', 'html'.", call. = FALSE)
   )
 
+  cat(output, "\n")
   if (!is.null(out)) {
     writeLines(output, con = out)
-  } else {
-    cat(output, "\n")
   }
 
   invisible(output)

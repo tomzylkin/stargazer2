@@ -1,21 +1,12 @@
 ## Submission
 
-This is a feature update (0.1.0 -> 0.1.1) to an already-accepted CRAN
-package.
+This is a patch update (0.1.1 -> 0.1.2) to an already-accepted CRAN package.
 
 ### Summary of changes
 
-* Added native support for `plm` panel-data models (`within`/FE,
-  `random`/RE, `pooling`, `fd`, `between`): fixed- and random-effects
-  reported as indicator rows, with SE type auto-detected, including
-  `plm`-specific `vcovHC`/`vcovSCC`/`vcovBK`/`vcovDC` estimators.
-
-* Added a `df` argument to `stargazer()` to optionally suppress the
-  `(df = ...)` suffixes on the Residual Std. Error and F Statistic rows.
-
-* `stargazer()` now detects correlation matrices (square, symmetric, 1s
-  on the diagonal) and renders them as an N x N grid in both `"text"` and
-  `"latex"` output.
+* `stargazer()` now always prints output to the console, even when `out` is
+  specified. Previously, specifying `out` suppressed console output. This
+  matches the behavior of the original `stargazer` package.
 
 No breaking changes; all existing arguments and output are unaffected.
 
